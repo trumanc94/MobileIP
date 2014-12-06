@@ -145,6 +145,36 @@ class foreignAgent
       list<visitorEntry> visitorList; // Visitor List           
 };
 
+class applicationLayer
+{
+   public:
+      string message;
+
+};
+
+class transportLayer
+{
+   // public
+   class UDPsegment
+   {
+      
+   }
+};
+
+class networkLayer
+{
+   
+};
+
+struct registerData()
+{
+   string COA;
+   string HAAddress;
+   string MNAddress;
+   int lifeTime
+   int id;
+};
+
 // Function Prototype Declarations
 void registerMN();
 
@@ -163,31 +193,42 @@ int main()
    testFA.printEntries();
    cout << endl;
 
-   // Register Mobile Node to Host Agent
-   registerMN();   
+   // Initialize objects
+   mobileNode MN;
+   hostAgent HA;
+   foreignAgent FA;
 
+   // Register Mobile Node to Host Agent
+   registerMN( MN, HA, FA );   
 
    return 0;
 }
 
 // Function Implementation
-void registerMN()
+/* steps on page 568 */
+void registerMN( mobileNode m, hostAgent h, foreignAgent f )
 {
    // Check if function is not at home network
    
-      // Listen for broadcast
+      // Listen for broadcast???
       
       // MN: send request to foreign agent
+      m.requestRegistration();
 
       // FA: relay request to host agent
+      f.relayToHost();
 
       // FA: update visitor table
+      f.addEntry();
       
       // HA: send reply to foreign agent
+      h.ackRegister();
 
       // HA: update binding table
+      h.addEntry();
       
-      // MN: relay reply to foreign agent
+      // FA: relay reply to mobile node
+      f.relayToMobileNode();
 
    // Otherwise, mobile IP is not needed
 }
