@@ -190,5 +190,4 @@ void registerMN()
       // MN: relay reply to foreign agent
 
    // Otherwise, mobile IP is not needed
-   
 }
