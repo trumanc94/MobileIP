@@ -145,6 +145,9 @@ class foreignAgent
       list<visitorEntry> visitorList; // Visitor List           
 };
 
+// Function Prototype Declarations
+void registerMN();
+
 // Main Simulation
 int main()
 {
@@ -159,6 +162,33 @@ int main()
    testFA.addEntry("544.444.44.44", "655.555.55.5", "76-66-66-66-66-66",8);
    testFA.printEntries();
    cout << endl;
-   
+
+   // Register Mobile Node to Host Agent
+   registerMN();   
+
+
    return 0;
+}
+
+// Function Implementation
+void registerMN()
+{
+   // Check if function is not at home network
+   
+      // Listen for broadcast
+      
+      // MN: send request to foreign agent
+
+      // FA: relay request to host agent
+
+      // FA: update visitor table
+      
+      // HA: send reply to foreign agent
+
+      // HA: update binding table
+      
+      // MN: relay reply to foreign agent
+
+   // Otherwise, mobile IP is not needed
+   
 }
