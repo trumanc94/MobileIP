@@ -263,6 +263,7 @@ cout << endl;
    // Register Mobile Node to Host Agent
    registerMN( MN, HA, FA );   
 
+   routeOptimization(MN, CN);
 
    
    return 0;
