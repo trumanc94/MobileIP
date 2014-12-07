@@ -1,6 +1,10 @@
 #include <iostream>
 #include <string>
 #include <list>
+#include <stdlib.h>
+#include <thread>
+#include <chrono>
+
 using namespace std;
 
 // Classes 
@@ -27,6 +31,8 @@ class homeAgent
       // Member Functions
       string getHA() { return HAAddress; }
 
+      bool isEmpty() { return bindingTable.empty(); }
+      
       void addEntry(string home, string coa, int time)
       {
          // Add new binding entry to Mobility Binding Table
@@ -145,6 +151,29 @@ class foreignAgent
       list<visitorEntry> visitorList; // Visitor List           
 };
 
+class datagram
+{
+   public:
+      // Constructor
+      datagram(string foreign, string home, string mobile, int time, int i)
+               :COA(foreign), HA(home), MA(mobile), lifetime(time), ID(i){}
+               
+      // Member Functions
+      string getCOA() { return COA; }
+      string getHA() { return HA; }
+      string getMA() { return MA; }
+      int getLifetime() { return lifetime; }
+
+   private:
+      // Members
+      string COA;    // COA of foreign agent
+      string HA;     // Home agent address
+      string MA;     // Permanent mobile node address
+      int lifetime;  // Lifetime of the registration entry
+      int ID;        // Identification number of the datagram      
+};
+
+/*
 class applicationLayer
 {
    public:
@@ -174,61 +203,114 @@ struct registerData()
    int lifeTime
    int id;
 };
+*/
 
 // Function Prototype Declarations
-void registerMN();
+void Sleep(int);
+string generateIP();
+void registerMN(mobileNode, homeAgent, foreignAgent);
 
 // Main Simulation
 int main()
 {
-   // TESTING
-   homeAgent testHA("111.111.111.1");
-   testHA.addEntry("111.111.111.1", "222.222.22.22", 3);
-   testHA.addEntry("211.111.111.1", "322.222.22.22", 4);
-   testHA.printEntries();
-   cout << endl;
-   foreignAgent testFA("222.222.222.2");
-   testFA.addEntry("444.444.44.44", "555.555.55.5", "66-66-66-66-66-66",7);
-   testFA.addEntry("544.444.44.44", "655.555.55.5", "76-66-66-66-66-66",8);
-   testFA.printEntries();
-   cout << endl;
-
+   srand((unsigned int) time(NULL));
+   
    // Initialize objects
-   mobileNode MN;
-   hostAgent HA;
-   foreignAgent FA;
+   mobileNode MN(generateIP());
+   homeAgent HA(generateIP());
+   foreignAgent FA(generateIP());
+   
+cout << "Mobile Node IP: " << MN.getIP() << endl;
+cout << "Home Agent address: " << HA.getHA() << endl;
+HA.printEntries();
+cout << endl;
+cout << "Foreign Agent address: " << FA.getFA() << endl;
+FA.printEntries();
+cout << endl;
 
+   // Display Main Menu
+   cout << "            Mobile IP            " << endl;
+   cout << "---------------------------------" << endl;
+/*
+   cout << "1. Mobile Node in Home Network" << endl;
+   cout << "2. Mobile Node in Foreign Network" << endl;
+   cout << "Enter your selection: ";
+   cin >> selection;
+*/
+  
+   
    // Register Mobile Node to Host Agent
    registerMN( MN, HA, FA );   
 
+   
    return 0;
 }
 
 // Function Implementation
-/* steps on page 568 */
-void registerMN( mobileNode m, hostAgent h, foreignAgent f )
+void Sleep(int time) { this_thread::sleep_for(chrono::seconds(time)); }
+
+string generateIP()
 {
-   // Check if function is not at home network
+   // Generate random IP address
+   int ipInt[4] = { rand() % 31 + 192,
+      rand() % 254 + 1,
+      rand() % 254 + 1,
+      rand() % 254 + 1};
+   string IP = to_string(ipInt[0]);   
+   for(int i = 1; i < 4; i++) IP += "." + to_string(ipInt[i]);
    
-      // Listen for broadcast???
+   // return the IP
+   return IP;
+}
+
+/* steps on page 568 */
+void registerMN( mobileNode m, homeAgent h, foreignAgent f )
+{
+   // Listen for broadcast???
+   cout << "Mobile Node listening for Home Agent or Foreign Agent advertisement..." << endl << endl;
+   Sleep(2);
+   
+   // Check if function is not at home network
+   if( h.isEmpty() )
+   {    
+      // Confirm Mobile Node is in foreign network
+      cout << "Mobile Node is in foreign network!" << endl << endl;
+      Sleep(2);
       
       // MN: send request to foreign agent
-      m.requestRegistration();
+      cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl << endl;
+      Sleep(2);
 
       // FA: relay request to host agent
-      f.relayToHost();
-
-      // FA: update visitor table
-      f.addEntry();
+      cout << "Foreign Agent: Sending registration request to Host Agent..." << endl << endl;
+      Sleep(2);
+      
+      // FA: update visitor list
+      cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
+      Sleep(2);
+      f.addEntry(m.getIP(), h.getHA(), "temporary MAC address", 20);
+      f.printEntries();
+      cout << endl << "Visitor List is updated!" << endl << endl;
+      Sleep(3);
       
       // HA: send reply to foreign agent
-      h.ackRegister();
-
+      cout << "Home Agent: Sending registration reply to Foreign Agent..." << endl << endl;
+      Sleep(2);
+      
       // HA: update binding table
-      h.addEntry();
+      cout << "Home Agent: Updated Mobile Binding Table..." << endl << endl;
+      Sleep(2);
+      h.addEntry(m.getIP(), f.getFA(), 30);
+      h.printEntries();
+      cout << endl << "Mobile Binding Table is updated!" << endl << endl;
+      Sleep(3);
       
       // FA: relay reply to mobile node
-      f.relayToMobileNode();
-
+      cout << "Foreign Agent: Sending registration reply to Mobile Node..." << endl << endl;
+      Sleep(2);
+   }
+   
    // Otherwise, mobile IP is not needed
+   else cout << "Mobile Node is in home network!" << endl;
+
 }
