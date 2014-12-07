@@ -12,14 +12,16 @@ class mobileNode
 {
    public:
       // Constructor
-      mobileNode(string internetProtocol) { IP = internetProtocol; }
+      mobileNode(string internetProtocol, string MACAddress) : IP (internetProtocol), MAC(MACAddress) {}
       
       // Member Functions
       string getIP() { return IP; }
-   
+      string getMAC() { return MAC; }
+
    private:
       // Members
       string IP;   // This is the permanent IP of the MN's home address   
+      string MAC;
 };
 
 class correspondentNode
@@ -57,15 +59,15 @@ class homeAgent
       void printEntries()
       {
          // Print Binding Table title
-         cout << "--------------------------------------------------";
+         cout << "-----------------------------------------------------";
          cout << endl;
-         cout << "              Mobility Binding Table              ";
+         cout << "               Mobility Binding Table                ";
          cout << endl;
-         cout << "--------------------------------------------------";
+         cout << "-----------------------------------------------------";
          cout << endl;
-         cout << "| Home Address | Care-of-Address | Lifetime(sec) |";
+         cout << "|  Home Address   | Care-of-Address | Lifetime(sec) |";
          cout << endl;
-         cout << "--------------------------------------------------";
+         cout << "-----------------------------------------------------";
          cout << endl;
                   
          // Iterate through Mobility Binding Table and print each entry
@@ -73,9 +75,12 @@ class homeAgent
          for(iterator = bindingTable.begin(); 
                               iterator != bindingTable.end(); ++iterator)
          {
-             cout << " " << (*iterator).homeAddress << " | ";
-             cout << (*iterator).COA << "   | ";
-             cout << (*iterator).lifetime << endl;
+             cout << "| " << (*iterator).homeAddress;
+             printSpaceAndBar((*iterator).homeAddress);
+             cout << (*iterator).COA;
+             printSpaceAndBar((*iterator).COA);
+             printLifeTime((*iterator).lifetime);
+             cout << " |" << endl;
          }
       }
       
@@ -93,8 +98,38 @@ class homeAgent
             string COA;          // Care-of-Address of a mobility node
             int lifetime;        // Lifetime of the entry in seconds
       };
+
+      // Member Functions
+      void printSpaceAndBar(string IP)
+      {
+	 for (unsigned i = 0; i < (15 - IP.length()); i++)
+		cout << " ";
+	 cout << " | ";
+      }
       
-      // Members
+      void printLifeTime(int val)
+      {
+	 int leftSpace = 6;
+	 int rightSpace = 6;
+	 int v = val / 10;
+	 while (v > 0)
+	 {
+		if (leftSpace == rightSpace)
+			leftSpace--;
+		else
+			rightSpace--;
+
+		v /= 10;
+ 	 }
+
+	 for (int i = 0; i < leftSpace; i++)
+	 	cout << " ";
+	 cout << val;
+ 	 for (int i = 0; i < rightSpace; i++)
+		cout << " ";
+	}
+
+      // Data Members
       string HAAddress;                // Home Agent address
       list<bindingEntry> bindingTable; // Mobility Binding Table     
 };
@@ -118,17 +153,17 @@ class foreignAgent
       void printEntries()
       {
          // Print Binding Table title
-         cout << "-------------------------------------------------------------------";
+         cout << "-------------------------------------------------------------------------";
          cout << endl;
-         cout << "                           Visitor List                            ";
+         cout << "                              Visitor List                               ";
          cout << endl;
-         cout << "-------------------------------------------------------------------";
+         cout << "-------------------------------------------------------------------------";
          cout << endl;
-         cout << "| Home Address |  Home Agent  |   Media Address   | Lifetime(sec) |";
+         cout << "|  Home Address   |   Home Agent    |   Media Address   | Lifetime(sec) |";
          cout << endl;
-         cout << "|              |    Address   |                   |               |";
+         cout << "|                 |     Address     |                   |               |";
          cout << endl;
-         cout << "-------------------------------------------------------------------";
+         cout << "-------------------------------------------------------------------------";
          cout << endl;
                   
          // Iterate through Mobility Binding Table and print each entry
@@ -136,10 +171,13 @@ class foreignAgent
          for(iterator = visitorList.begin(); 
                               iterator != visitorList.end(); ++iterator)
          {
-             cout << " " << (*iterator).homeAddress << " | ";
-             cout << (*iterator).HAAddress << " | ";
+             cout << "| " << (*iterator).homeAddress;
+             printSpaceAndBar((*iterator).homeAddress);
+             cout << (*iterator).HAAddress;
+             printSpaceAndBar((*iterator).HAAddress);
              cout << (*iterator).mediaAddress << " | ";
-             cout << (*iterator).lifetime << endl;
+             printLifeTime((*iterator).lifetime);
+             cout << " |" << endl;
          }
       }
                
@@ -160,7 +198,37 @@ class foreignAgent
             int lifetime;        // Lifetime of the entry in seconds
       };
       
-      // Members
+      // Member Functions
+      void printSpaceAndBar(string IP)
+      {
+	 for (unsigned i = 0; i < (15 - IP.length()); i++)
+		cout << " ";
+	 cout << " | ";
+      }
+      
+      void printLifeTime(int val)
+      {
+	 int leftSpace = 6;
+	 int rightSpace = 6;
+	 int v = val / 10;
+	 while (v > 0)
+	 {
+		if (leftSpace == rightSpace)
+			leftSpace--;
+		else
+			rightSpace--;
+
+		v /= 10;
+ 	 }
+
+	 for (int i = 0; i < leftSpace; i++)
+	 	cout << " ";
+	 cout << val;
+ 	 for (int i = 0; i < rightSpace; i++)
+		cout << " ";
+	}
+      
+      // Data Members
       string FAAddress;               // Foreign Agent address
       list<visitorEntry> visitorList; // Visitor List           
 };
@@ -226,6 +294,7 @@ struct registerData()
 // Function Prototype Declarations
 void Sleep(int);
 string generateIP();
+string generateMAC();
 void registerMN(mobileNode, homeAgent, foreignAgent);
 void reverseTunnel(mobileNode, homeAgent, foreignAgent, correspondentNode);
 void routeOptimization(mobileNode, correspondentNode);
@@ -236,7 +305,7 @@ int main()
    srand((unsigned int) time(NULL));
    
    // Initialize objects
-   mobileNode MN(generateIP());
+   mobileNode MN(generateIP(), generateMAC());
    homeAgent HA(generateIP());
    foreignAgent FA(generateIP());
    correspondentNode CN(generateIP());
@@ -286,6 +355,29 @@ string generateIP()
    return IP;
 }
 
+string generateMAC()
+{
+   // Generate random MAC address
+   char buffer[33];
+   string MAC = "";
+
+   _itoa_s((rand() % 254 + 1), buffer, 4, 16);
+   if (string(buffer).length() == 1)
+	MAC += "0";
+   MAC += buffer;
+
+   for (int i = 1; i < 6; i++)
+   {
+   	_itoa_s((rand() % 254 + 1), buffer, 4, 16);
+	MAC += "-";
+	if (string(buffer).length() == 1)
+		MAC += "0";
+	MAC += buffer;
+   }
+  
+   return MAC;
+}
+
 /* steps on page 568 */
 void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 {
@@ -311,7 +403,7 @@ void registerMN( mobileNode m, homeAgent h, foreignAgent f )
       // FA: update visitor list
       cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
       Sleep(2);
-      f.addEntry(m.getIP(), h.getHA(), "temporary MAC address", 20);
+      f.addEntry(m.getIP(), h.getHA(), m.getMAC(), 20);
       f.printEntries();
       cout << endl << "Visitor List is updated!" << endl << endl;
       Sleep(3);
