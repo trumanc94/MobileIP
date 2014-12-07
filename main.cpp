@@ -17,7 +17,17 @@ class mobileNode
       // Member Functions
       string getIP() { return IP; }
       string getMAC() { return MAC; }
-   
+
+      void sendRequest( registrationMessage &msg )
+      {
+      	
+      }
+
+      void receiveReply( registrationMessage &msg )
+      {
+
+      }
+      
    private:
       // Members
       string IP;   // This is the permanent IP of the MN's home address 
@@ -48,14 +58,24 @@ class homeAgent
       string getHA() { return HAAddress; }
 
       bool isEmpty() { return bindingTable.empty(); }
-      
+
+      void receiveRequest( registrationMessage &msg )
+      {
+		//addEntry()      	
+      }
+
       void addEntry(string home, string coa, int time)
       {
          // Add new binding entry to Mobility Binding Table
          bindingEntry temp(home, coa, time);
          bindingTable.push_front(temp);
       }
-      
+
+      void sendReply( registrationMessage &msg )
+      {
+      	
+      }
+
       void printEntries()
       {
          // Print Binding Table title
@@ -142,6 +162,11 @@ class foreignAgent
          
       // Member Functions
       string getFA() { return FAAddress; }         
+
+      void receiveRequest( registrationMessage &msg )
+      {
+		// add entry      	
+      }
          
       void addEntry(string home, string HA, string MAC, int time)
       {
@@ -149,7 +174,17 @@ class foreignAgent
          visitorEntry temp(home, HA, MAC, time);
          visitorList.push_front(temp);
       }
-      
+
+      void sendRequest( registrationMessage &msg )
+      {
+      	
+      }
+
+      void receiveAndSendReply( registrationMessage &msg )
+      {
+      	
+      }
+
       void printEntries()
       {
          // Print Binding Table title
@@ -259,6 +294,30 @@ class datagram
       int ID;        // Identification number of the datagram      
 };
 
+class registrationMessage
+{
+   public:
+	registerData( string type, string c, string h, string m, string e, int l, int i )
+		: registerType(type), COA(c), HAAddress(h), MNAddress(m), EncapFormat(e), lifeTime(l), id(i){}
+
+	string getRegisterType() { return registerType };
+	string getCOA(){ return COA };
+	string getHAAddress(){ return HAAddress };
+	string getMNAddress(){ return MNAddress };
+	string getEncapFormat(){ return EncapFormat };
+	int getLifetime(){ return lifeTime };
+	int getID(){ return id };
+
+   private:
+   	   string registerType; // REQUEST or REPLY
+	   string COA;
+	   string HAAddress;
+	   string MNAddress;
+	   string EncapFormat; // encapsulation
+	   int lifeTime
+	   int id;
+};
+
 /*
 class applicationLayer
 {
@@ -279,15 +338,6 @@ class transportLayer
 class networkLayer
 {
    
-};
-
-struct registerData()
-{
-   string COA;
-   string HAAddress;
-   string MNAddress;
-   int lifeTime
-   int id;
 };
 */
 
@@ -380,6 +430,10 @@ string generateMAC()
 /* steps on page 568 */
 void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 {
+   // Initialize variables
+   registrationMessage regData;
+
+//??
    // Listen for broadcast???
    cout << "Mobile Node listening for Home Agent or Foreign Agent advertisement..." << endl << endl;
    Sleep(2);
@@ -392,14 +446,17 @@ void registerMN( mobileNode m, homeAgent h, foreignAgent f )
       Sleep(2);
       
       // MN: send request to foreign agent
+      m.sendRequest( regData );
       cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl << endl;
       Sleep(2);
 
       // FA: relay request to host agent
+      f.receiveRequest( regData );
       cout << "Foreign Agent: Sending registration request to Host Agent..." << endl << endl;
       Sleep(2);
       
       // FA: update visitor list
+      f.sendRequest( regData );
       cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
       Sleep(2);
       f.addEntry(m.getIP(), h.getHA(), m.getMAC(), 20);
