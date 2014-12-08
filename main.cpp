@@ -636,8 +636,6 @@ void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeig
     else cout << "Mobile Node is in home network, no need for Mobile IP!" << endl;
 
 	// Print divisor for next section
-	cout << "---------------------------------------------------------" << endl;
-	system("PAUSE");
 	cout << "---------------------------------------------------------" << endl << endl;
 
 }
@@ -732,8 +730,6 @@ void registerMN( mobileNode &m, homeAgent &h, foreignAgent &f )
 	cout << "Mobile Node: Received registration reply!" << endl;
 
 	// Print divisor for next section
-	cout << "---------------------------------------------------------" << endl;
-	system("PAUSE");
 	cout << "---------------------------------------------------------" << endl << endl;
 
 }
@@ -842,10 +838,6 @@ void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNo
 	// MN: Show received message
 	cout << "Mobile Node: Received Correspondent's datagram!" << endl;
 	cout << "Mobile Node: Moving to new foreign network!" << endl << endl << endl;
-
-	// System pause
-	system("PAUSE");
-	cout << endl << endl;
 
 	// Mobile Node moves to new foreign network
 		// Initialize new foreign agent and ICMP advertisement message
