@@ -52,17 +52,27 @@ class registrationMessage
 {
    public:
 	    // Constructor
-		registrationMessage( registration_t type, string c, string h, string m, string e, int l, int i )
-			: registerType(type), COA(c), HAAddress(h), MNAddress(m), EncapFormat(e), lifeTime(l), id(i) {}
+		registrationMessage( registration_t type, string c, string h, string m, int l, int i )
+			: registerType(type), COA(c), HAAddress(h), MNAddress(m), lifeTime(l), id(i) {}
 
 		// Member Functions
 		registration_t getRegisterType() { return registerType; }
 		string getCOA(){ return COA; }
 		string getHAAddress(){ return HAAddress; }
 		string getMNAddress(){ return MNAddress; }
-		string getEncapFormat(){ return EncapFormat; }
 		int getLifetime(){ return lifeTime; }
 		int getID(){ return id; }
+
+		void printRegistration(bool encapsulation)
+		{
+			if(encapsulation) cout << "[ENCAPSULATED] ";
+			cout << "Registration(";
+			if(registerType == REQUEST) cout << "Request): ";
+			else cout << "Reply): ";			
+			if(COA != "") cout << "COA(" << COA << "), ";
+			cout << "HA(" << HAAddress << "), MA(" << MNAddress << "), Lifetime(" << lifeTime << "), ID(" << id << ")";			
+			cout << endl << endl;
+		}
 
    private:
 	   // Data Members
@@ -70,7 +80,6 @@ class registrationMessage
 	   string COA;					// Care-of-Address of mobile node in foreign network
 	   string HAAddress;			// Home agent address
 	   string MNAddress;			// Mobile node permanent address
-	   string EncapFormat;			// encapsulation format
 	   int lifeTime;				// Lifetime of requested registration
 	   int id;						// 64-bit ID of message (Acts like sequence number to match REQUEST/REPLY)
 };
@@ -86,16 +95,6 @@ class mobileNode
       string getMAC() { return MAC; }
 	  void setCOA(string careOfAddress) { COA = careOfAddress; }
 	  string getCOA() { return COA; }
-
-      void sendRequest( registrationMessage &msg )
-      {
-      	
-      }
-
-      void receiveReply( registrationMessage &msg )
-      {
-
-      }
       
    private:
       // Members
@@ -127,23 +126,11 @@ class homeAgent
       // Member Functions
       string getHA() { return HAAddress; }
 
-      bool isEmpty() { return bindingTable.empty(); }
-
-      void receiveRequest( registrationMessage &msg )
-      {
-		//addEntry()      	
-      }
-
       void addEntry(string home, string coa, int time)
       {
          // Add new binding entry to Mobility Binding Table
          bindingEntry temp(home, coa, time);
          bindingTable.push_front(temp);
-      }
-
-      void sendReply( registrationMessage &msg )
-      {
-      	
       }
 
       void printEntries()
@@ -230,26 +217,11 @@ class foreignAgent
       // Member Functions
       string getFA() { return FAAddress; }         
 
-      void receiveRequest( registrationMessage &msg )
-      {
-		// add entry      	
-      }
-         
       void addEntry(string home, string HA, string MAC, int time)
       {
          // Add new binding entry to Mobility Binding Table
          visitorEntry temp(home, HA, MAC, time);
          visitorList.push_front(temp);
-      }
-
-      void sendRequest( registrationMessage &msg )
-      {
-      	
-      }
-
-      void receiveAndSendReply( registrationMessage &msg )
-      {
-      	
       }
 
       void printEntries()
@@ -337,24 +309,24 @@ class datagram
    public:
       // Constructor
       datagram(string src, string dest, int time, int i)
-               :source(src), destination(dest), lifetime(time), ID(i){}
+               :source(src), destination(dest), TTL(time), ID(i){}
                
       // Member Functions
       string getSrc() { return source; }
       string getDest() { return destination; }
-      int getLifetime() { return lifetime; }
+      int getTTL() { return TTL; }
       void print() {
 
-          cout << "Src: " << source << " Dest: " << destination << " TTL: " << lifetime << " Id: " << ID << endl << endl;
+          cout << "Src: " << source << " Dest: " << destination << " TTL: " << TTL << " Id: " << ID << endl << endl;
 	  }
 	
-	  void decreaseTTL(){lifetime--;}
+	  void decreaseTTL(){TTL--;}
 
    private:
       // Members
       string source;    // Source address
       string destination;     // Destination address
-      int lifetime;  // Lifetime of the registration entry
+      int TTL;  // Lifetime of the registration entry
       int ID;        // Identification number of the datagram      
 };
 
@@ -395,10 +367,10 @@ int main()
 {
 	// Seed time
 	srand((unsigned int) time(NULL));
-   
+
     // Initialize objects
     mobileNode MN(generateIP(), generateMAC());
-    homeAgent HA(generateIP());
+	homeAgent HA(MN.getIP().replace(MN.getIP().find_last_of("."), 4, "." + to_string(rand() % 254 + 1)));
     foreignAgent FA(generateIP());
     correspondentNode CN(generateIP());
 	char selection;
@@ -442,7 +414,7 @@ int main()
 	// If mobile node is in foreign network
     if(selection == 'F' || selection == 'f')
     {
-	    // Register Mobile Node to Host Agent
+	    // Register Mobile Node to Home Agent
 	    registerMN( MN, HA, FA );   
 
 	    routeOptimization(MN, CN);
@@ -537,7 +509,7 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 		if(homeOrForeign == 'H' || homeOrForeign == 'h')
 		{
 			// Initialize ICMP advertisement message
-			ICMP advertisement(ADVERTISEMENT, h.getHA(), true, false, true);
+			ICMP advertisement(ADVERTISEMENT, h.getHA(), true, false, false);
 			advertisement.insertCOA(h.getHA());
 
 			// Print advertisement
@@ -563,6 +535,9 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 	// Check if function is not at home network	
 	if( homeOrForeign == 'F' || homeOrForeign == 'f')
     {    
+	   // Set COA for mobile node
+		m.setCOA(f.getFA());
+
        // Confirm Mobile Node is in foreign network
        cout << "Mobile Node is in foreign network!" << endl << endl;
        Sleep(2);
@@ -582,44 +557,57 @@ void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 	cout << "---------------------------------------------------------" << endl;
 	cout << "                Registration with Home Agent             " << endl;
 	cout << "---------------------------------------------------------" << endl;
-
-	// Initialize variables
-//   registrationMessage regData(;
          
-   // MN: send request to foreign agent
-//   m.sendRequest( regData );
-   cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl << endl;
-   Sleep(2);
+	// Create registration lifetime and ID
+	int lifetimeRequest = rand() % 800 + 199;
+	int lifetimeReply = lifetimeRequest - rand() % 199;
+	int registrationId = rand() % 999;
 
-   // FA: relay request to host agent
-//   f.receiveRequest( regData );
-   cout << "Foreign Agent: Sending registration request to Host Agent..." << endl << endl;
-   Sleep(2);
-      
-   // FA: update visitor list
-//   f.sendRequest( regData );
-   cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
-   Sleep(2);
-   f.addEntry(m.getIP(), h.getHA(), m.getMAC(), 20);
-   f.printEntries();
-   cout << endl << "Visitor List is updated!" << endl << endl;
-   Sleep(3);
-      
-   // HA: send reply to foreign agent
-   cout << "Home Agent: Sending registration reply to Foreign Agent..." << endl << endl;
-   Sleep(2);
-      
-   // HA: update binding table
-   cout << "Home Agent: Updated Mobile Binding Table..." << endl << endl;
-   Sleep(2);
-   h.addEntry(m.getIP(), f.getFA(), 30);
-   h.printEntries();
-   cout << endl << "Mobile Binding Table is updated!" << endl << endl;
-   Sleep(3);
-      
-   // FA: relay reply to mobile node
-   cout << "Foreign Agent: Sending registration reply to Mobile Node..." << endl << endl;
-   Sleep(2);   
+    // MN: send request to foreign agent
+		// Initialize registration REQUEST
+		registrationMessage request(REQUEST, m.getCOA(), h.getHA(), m.getIP(), lifetimeRequest, registrationId);
+	    cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl;
+		request.printRegistration(false);
+		cout << endl;
+	    Sleep(2);
+
+    // FA: update visitor list
+    cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
+    Sleep(2);
+    f.addEntry(m.getIP(), h.getHA(), m.getMAC(), lifetimeRequest);
+    f.printEntries();
+    cout << endl << "Visitor List is updated!" << endl << endl << endl;
+    Sleep(3);
+
+    // FA: forward request to home agent
+    cout << "Foreign Agent: Forwarding registration request to Home Agent..." << endl;
+    request.printRegistration(true);
+	cout << endl;
+	Sleep(2);
+            
+    // HA: update binding table
+    cout << "Home Agent: Updated Mobile Binding Table..." << endl << endl;
+    Sleep(2);
+    h.addEntry(m.getIP(), f.getFA(), lifetimeReply);
+    h.printEntries();
+    cout << endl << "Mobile Binding Table is updated!" << endl << endl << endl;
+    Sleep(3);
+
+	// HA: send reply to foreign agent
+		// Initialize registration REPLY
+		registrationMessage reply(REPLY, "", h.getHA(), m.getIP(), lifetimeReply, registrationId);
+		cout << "Home Agent: Sending registration reply to Foreign Agent..." << endl;
+		reply.printRegistration(true);
+		cout << endl;
+		Sleep(2);
+            
+    // FA: relay reply to mobile node
+    cout << "Foreign Agent: Forwarding registration reply to Mobile Node..." << endl;
+	reply.printRegistration(false);
+    Sleep(2);   
+
+	// Print divisor for next section
+	cout << "---------------------------------------------------------" << endl << endl;
 }
 
 
