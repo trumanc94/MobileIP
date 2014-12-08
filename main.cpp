@@ -4,7 +4,7 @@ CPE 400
 Project 2
 Topic: Mobile IP
 */
-
+ 
 /*
 Abstract: Mobile IP allows mobile devices to keep their same IP address when they move between 
 		  networks. The main goal with IP mobility is to maintain a relatively unchanged TCP 
@@ -18,19 +18,45 @@ Abstract: Mobile IP allows mobile devices to keep their same IP address when the
 #include <stdlib.h>
 #include <thread>
 #include <chrono>
+#include <fstream>
 
 using namespace std;
 
 // Global Variables
 const int sleepTime = 0;	// Sets amount of time between each simulator display message
 
-// Classes 
+// Enumerations
+enum network { FOREIGN, HOME };
+enum routingMethod { INDIRECT, DIRECT };
+enum ICMP_t { ADVERTISEMENT, SOLICITATION }; // advertisement is type 9, solicitation is type 10
+enum registration_t { REQUEST, REPLY };
+
+// Class declarations
+class ICMP;
+class registrationMessage;
+class mobileNode;
+class correspondentNode;
+class agent;
+class datagram;
+
+// Function Prototype Declarations
+void Sleep(int);
+string generateIP();
+string generateMAC();
+
+void displayInformation(mobileNode, agent, int);
+void configuration(ICMP_t&, routingMethod&, int&, int&);
+void agentDiscovery(mobileNode, agent, char);
+void registerMN(mobileNode&, agent&);
+void indirectRouting(mobileNode, agent, correspondentNode);
+void directRouting(mobileNode, agent, correspondentNode);
+
+// Class Implementations
 /*
 The ICMP class is used during the agent discovery portion of mobile IP. Advertisements from
 home agents and foreign agents, along with the solicitation message from mobile nodes are
 ICMP messages
 */
-enum ICMP_t { ADVERTISEMENT, SOLICITATION }; // advertisement is type 9, solicitation is type 10
 class ICMP
 {
 	public:
@@ -74,7 +100,6 @@ The registration message class is used during the registration portion of mobile
 Registration messages are sent inside UDP datagrams between the mobile node, foreign agent,
 and home agent.
 */
-enum registration_t { REQUEST, REPLY };
 class registrationMessage
 {
    public:
@@ -119,10 +144,28 @@ class mobileNode
 {
    public:
       // Constructor
-      mobileNode(string internetProtocol, string MACAddress) : IP (internetProtocol), MAC(MACAddress) {}
+	  mobileNode() { IP = generateIP(); MAC = generateMAC(); COA = ""; }
       
       // Member Functions
       string getIP() { return IP; }
+	  void setIP(string address, mobileNode a[], int size) 
+	  { 
+		  IP = address.replace(address.find_last_of("."), 4, "." + to_string(rand() % 254 + 1)); 
+// TODO: FIX FUNCTION BELOW SO THERE ARE NO DUPLICATE IPs		 
+/*
+		bool flag;
+		do
+		{
+		  flag = false;
+		  IP = address.replace(address.find_last_of("."), 4, "." + to_string(rand() % 254 + 1)); 
+		  for(int i=0;i<size;i++)
+		  {
+			  if(IP == a[i].getIP()) flag = true;			
+			  cout << "IN LOOP " << i << endl;
+		  }
+		} while(flag);
+*/	  
+	  }
       string getMAC() { return MAC; }
 	  void setCOA(string careOfAddress) { COA = careOfAddress; }
 	  string getCOA() { return COA; }
@@ -155,24 +198,36 @@ class correspondentNode
 Home agent is the entity in a home network that performs the mobility management functions
 for the mobile node, such as forwarding packets to a foreign agent of a foreign network in
 which the mobile node is located.
+
+Foreign agent is an entity inside a foreign network that helps the mobile node with mobility
+management functions, such as receiving datagrams addressed to a mobile node located in its
+network.
 */
-class homeAgent
+class agent
 {
    public:
       // Constructor
-      homeAgent(string HA) { HAAddress = HA; }
+	  agent() { address = generateIP(); }	  
       
       // Member Functions
-      string getHA() { return HAAddress; }
+      string getAddress() { return address; }
+	  bool isHome(string IP) { if(IP == address.substr(address.find_last_of("."))); }
 
-      void addEntry(string home, string coa, int time)
+      void addBindingEntry(string home, string coa, int time)
       {
          // Add new binding entry to Mobility Binding Table
          bindingEntry temp(home, coa, time);
          bindingTable.push_front(temp);
       }
+      void addVisitorEntry(string home, string HA, string MAC, int time)
+      {
+         // Add new binding entry to Mobility Binding Table
+         visitorEntry temp(home, HA, MAC, time);
+         visitorList.push_front(temp);
+      }
 
-      void printEntries()
+	  // Print Functions
+      void printBindingEntries()
       {
          // Print Binding Table title
          cout << "-----------------------------------------------------";
@@ -199,7 +254,36 @@ class homeAgent
              cout << " |" << endl;             
          }
       }
-      
+      void printVisitorEntries()
+      {
+         // Print Visitor List title
+         cout << "-------------------------------------------------------------------------";
+         cout << endl;
+         cout << "                              Visitor List                               ";
+         cout << endl;
+         cout << "-------------------------------------------------------------------------";
+         cout << endl;
+         cout << "|  Home Address   |   Home Agent    |   Media Address   | Lifetime(sec) |";
+         cout << endl;
+         cout << "|                 |     Address     |                   |               |";
+         cout << endl;
+         cout << "-------------------------------------------------------------------------";
+         cout << endl;
+                  
+         // Iterate through Mobility Binding Table and print each entry
+         std::list<visitorEntry>::const_iterator iterator;
+         for(iterator = visitorList.begin(); 
+                              iterator != visitorList.end(); ++iterator)
+         {
+             cout << "| " << (*iterator).homeAddress;
+             printSpaceAndBar((*iterator).homeAddress);
+             cout << (*iterator).HAAddress;
+             printSpaceAndBar((*iterator).HAAddress);
+             cout << (*iterator).mediaAddress << " | ";
+             printLifeTime((*iterator).lifetime);
+             cout << " |" << endl;
+         }
+      }      
    private:
       // Mobility Binding Table entries
       class bindingEntry
@@ -212,6 +296,21 @@ class homeAgent
             // Members
             string homeAddress;  // Home address of a mobility node
             string COA;          // Care-of-Address of a mobility node
+            int lifetime;        // Lifetime of the entry in seconds
+      };
+      // Visitor List entries
+      class visitorEntry
+      {
+         public:
+            // Constructor
+            visitorEntry(string home, string HA, string MAC, int time)
+                  :homeAddress(home), HAAddress(HA), mediaAddress(MAC),
+                                                          lifetime(time){}
+                                                          
+            // Members
+            string homeAddress;  // Home address of a mobility node
+            string HAAddress;    // Home agent address
+            string mediaAddress; // MAC address
             int lifetime;        // Lifetime of the entry in seconds
       };
 
@@ -242,110 +341,11 @@ class homeAgent
  		for (int i = 0; i < rightSpace; i++) cout << " ";
 	 }
 
+
       // Data Members
-      string HAAddress;                // Home Agent address
+      string address;                // Home Agent or Foreign Agent address
       list<bindingEntry> bindingTable; // Mobility Binding Table     
-};
-
-/*
-Foreign agent is an entity inside a foreign network that helps the mobile node with mobility
-management functions, such as receiving datagrams addressed to a mobile node located in its
-network.
-*/
-class foreignAgent
-{
-   public:
-      // Constructor
-      foreignAgent(string FA) { FAAddress = FA; }
-         
-      // Member Functions
-      string getFA() { return FAAddress; }         
-
-      void addEntry(string home, string HA, string MAC, int time)
-      {
-         // Add new binding entry to Mobility Binding Table
-         visitorEntry temp(home, HA, MAC, time);
-         visitorList.push_front(temp);
-      }
-
-      void printEntries()
-      {
-         // Print Binding Table title
-         cout << "-------------------------------------------------------------------------";
-         cout << endl;
-         cout << "                              Visitor List                               ";
-         cout << endl;
-         cout << "-------------------------------------------------------------------------";
-         cout << endl;
-         cout << "|  Home Address   |   Home Agent    |   Media Address   | Lifetime(sec) |";
-         cout << endl;
-         cout << "|                 |     Address     |                   |               |";
-         cout << endl;
-         cout << "-------------------------------------------------------------------------";
-         cout << endl;
-                  
-         // Iterate through Mobility Binding Table and print each entry
-         std::list<visitorEntry>::const_iterator iterator;
-         for(iterator = visitorList.begin(); 
-                              iterator != visitorList.end(); ++iterator)
-         {
-             cout << "| " << (*iterator).homeAddress;
-             printSpaceAndBar((*iterator).homeAddress);
-             cout << (*iterator).HAAddress;
-             printSpaceAndBar((*iterator).HAAddress);
-             cout << (*iterator).mediaAddress << " | ";
-             printLifeTime((*iterator).lifetime);
-             cout << " |" << endl;
-         }
-      }
-               
-   private:
-      // Visitor List entries
-      class visitorEntry
-      {
-         public:
-            // Constructor
-            visitorEntry(string home, string HA, string MAC, int time)
-                  :homeAddress(home), HAAddress(HA), mediaAddress(MAC),
-                                                          lifetime(time){}
-                                                          
-            // Members
-            string homeAddress;  // Home address of a mobility node
-            string HAAddress;    // Home agent address
-            string mediaAddress; // MAC address
-            int lifetime;        // Lifetime of the entry in seconds
-      };
-      
-      // Member Functions
-      void printSpaceAndBar(string IP)
-      {
-		for (unsigned i = 0; i < (15 - IP.length()); i++) cout << " ";
-		cout << " | ";
-      }
-      
-      void printLifeTime(int val)
-      {
-		int leftSpace = 6;
-		int rightSpace = 6;
-		int v = val / 10;
-		while (v > 0)
-		{
-			if (leftSpace == rightSpace)
-			leftSpace--;
-			else
-			rightSpace--;
-
-			v /= 10;
- 		}
-
-		for (int i = 0; i < leftSpace; i++)	cout << " ";
-		cout << val;
- 		for (int i = 0; i < rightSpace; i++) cout << " ";
-	  }
-      
-      // Data Members
-      string FAAddress;               // Foreign Agent address
-      list<visitorEntry> visitorList; // Visitor List           
+      list<visitorEntry> visitorList; // Visitor List  
 };
 
 /*
@@ -382,70 +382,62 @@ class datagram
       int sequenceNumber;	   // Identification number of the datagram      
 };
 
-// Function Prototype Declarations
-void Sleep(int);
-string generateIP();
-string generateMAC();
-void displayInformation(mobileNode, homeAgent, foreignAgent);
-void agentDiscovery(mobileNode, homeAgent, foreignAgent, char);
-void registerMN(mobileNode&, homeAgent&, foreignAgent&);
-void indirectRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
-void directRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
-
 // Main Simulation
 int main()
 {
 	// Seed time
 	srand((unsigned int) time(NULL));
-
+/*
     // Initialize objects
     mobileNode MN(generateIP(), generateMAC());
 	homeAgent HA(MN.getIP().replace(MN.getIP().find_last_of("."), 4, "." + to_string(rand() % 254 + 1)));
     foreignAgent FA(generateIP());
     correspondentNode CN(generateIP());
+*/
 	char selection;
 	bool keepRunning = true;
 
-	// Display information
-	cout << endl << "----------------------INFORMATION------------------------" << endl << endl;
-	cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
-	cout << "Home Agent address: " << HA.getHA() << endl;
-	HA.printEntries();
-	cout << endl;
-	cout << "Foreign Agent address: " << FA.getFA() << endl;
-	FA.printEntries();
-	cout << endl;
-	cout << "----------------------INFORMATION------------------------" << endl << endl << endl;
+	// Do while simulation
+	do
+	{
+		// Initialize configuration variables
+		ICMP_t agentDiscoveryConfig;
+		routingMethod routingConfig;
+		int numMN = 1, numAgents = 1;
 
-    // Display Main Menu
-	do {
-		cout << "---------------------------------------------------------" << endl;
-		cout << "                        Mobile IP                        " << endl;
-	    cout << "---------------------------------------------------------" << endl;
-	    cout << "Select if mobile node is in (H)ome or (F)oreign network: ";
-	    cin >> selection;
-	    switch(selection)
- 		{
-			case 'H':
-			case 'h':
-			case 'F':
-			case 'f':
-				keepRunning = false;
-				break;
-			default:
-				cout << endl << "Incorrect input, try again!";		
+		// Display Configuration Menu
+		configuration(agentDiscoveryConfig, routingConfig, numMN, numAgents);
+
+		// Initialize mobile nodes, home agents, foreign agents
+		mobileNode* mnArray = new mobileNode[numMN];
+		agent* agentArray = new agent[numAgents];
+
+		cout << "Mobile Nodes" << endl;
+		for(int i=0;i<numMN;i++)
+		{
+			mnArray[i].setIP(agentArray[rand()%numAgents].getAddress(), mnArray, numMN);
+			cout << mnArray[i].getIP() << endl;
 		}
-		cout << endl;
-	} while(keepRunning);
+
+		cout << endl << "Agents" << endl;
+		for(int i=0;i<numAgents;i++)
+		{
+			cout << agentArray[i].getAddress() << endl;
+		}
+		// Display mobile node, home agent, foreign agent information
+//		displayInformation(MN, HA, FA, 2);
+
+	} while(false);
+
 
     // Agent Discovery
-    agentDiscovery(MN, HA, FA, selection);
+//    agentDiscovery(MN, HA, FA, selection);
    
 	// If mobile node is in foreign network
     if(selection == 'F' || selection == 'f')
     {
 	    // Register Mobile Node to Home Agent
-	    registerMN( MN, HA, FA );   
+//	    registerMN( MN, HA, FA );   
 
 		// Display Menu for routing
 		keepRunning = true;
@@ -461,11 +453,11 @@ int main()
 			switch(selection)
  			{
 				case '1':
-					indirectRouting(MN, HA, FA, CN);
+//					indirectRouting(MN, HA, FA, CN);
 					keepRunning = false;
 					break;
 				case '2':
-					directRouting(MN, HA, FA, CN);
+//					directRouting(MN, HA, FA, CN);
 					keepRunning = false;
 					break;
 				default:
@@ -526,13 +518,100 @@ string generateMAC()
 /*
 Prints information of mobile node, home agent, foreign agent
 */
-void displayInformation(mobileNode MN, homeAgent HA, foreignAgent FA)
+/*
+void displayInformation(mobileNode MN, agent A, int menu)
 {
-	// Display information
-	cout << "Mobile Node IP: " << MN.getIP() << endl;
-	cout << "Home Agent address: " << HA.getHA() << endl;
-	cout << "Foreign Agent address: " << FA.getFA() << endl;
-	cout << "--------------------------------------" << endl << endl;
+	if( menu == 1)
+	{
+		// Display information
+		cout << "Mobile Node IP: " << MN.getIP() << endl;
+		cout << "Home Agent address: " << HA.getHA() << endl;
+		cout << "Foreign Agent address: " << FA.getFA() << endl;
+		cout << "--------------------------------------" << endl << endl;
+	}
+
+	else
+	{
+		// Display information
+		cout << endl << "----------------------INFORMATION------------------------" << endl << endl;
+		cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
+		cout << "Home Agent address: " << HA.getHA() << endl;
+		HA.printEntries();
+		cout << endl;
+		cout << "Foreign Agent address: " << FA.getFA() << endl;
+		FA.printEntries();
+		cout << endl;
+		cout << "----------------------INFORMATION------------------------" << endl << endl << endl;
+	}
+}
+*/
+void configuration(ICMP_t& agentDiscovery, routingMethod& r, int& numMN, int& numA)
+{
+	// Initialize variables
+	char selection;
+	bool continueRunning = true, flag1 = false, flag2 = false;
+
+	// Display Title
+	cout << "---------------------------------------------------------" << endl;
+	cout << "                        Mobile IP                        " << endl;
+    cout << "---------------------------------------------------------" << endl;
+
+	// Prompt for configuration
+	do {
+		// Agent Discovery prompt
+		if(!flag1)
+		{
+			cout << "Select Agent Discovery method as (A)dvertisement or (S)olicitation: ";
+			cin >> selection;
+			switch(selection)
+ 			{
+				case 'A':
+				case 'a':
+					agentDiscovery = ADVERTISEMENT;
+					flag1 = true;
+					break;
+				case 'S':
+				case 's':
+					agentDiscovery = SOLICITATION;
+					flag1 = true;
+					break;
+				default:
+					cout << endl << "Incorrect input, try again!";		
+			}
+			cout << endl;
+		}
+		// Routing of datagrams prompt
+		else if(!flag2)
+		{
+			cout << "Select Routing method of datagrams as (I)ndirect or (D)irect: ";
+			cin >> selection;
+			switch(selection)
+ 			{
+				case 'I':
+				case 'i':
+					r = INDIRECT;
+					flag2 = true;
+					break;
+				case 'D':
+				case 'd':
+					r = DIRECT;
+					flag2 = true;
+					break;
+				default:
+					cout << endl << "Incorrect input, try again!";		
+			}
+			cout << endl;
+		}
+		// Number of mobile nodes, home agents, foreign agents prompt
+		else
+		{
+			cout << "Enter number of Mobile Nodes: ";
+			cin >> numMN;
+			cout << "Enter number of Agents: ";
+			cin >> numA;
+			continueRunning = false;
+		}
+	} while(continueRunning);		
 }
 
 /*
@@ -549,7 +628,8 @@ The second method is through solicitation, where the mobile node broadcasts an I
 specified with a type field of 10. When an agent receives the ICMP message, it unicasts an
 agent advertisement to that mobile node.
 */
-void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeign)
+/*
+void agentDiscovery(mobileNode m, agent A, char homeOrForeign)
 {
 	// Select method (advertisement or solicitation)
 	char selection;
@@ -575,7 +655,7 @@ void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeig
 	} while(keepRunning);
 
 	// Display information
-	displayInformation(m, h, f);
+	displayInformation(m, h, f, 1);
 
 	// Solicitation
 	if(selection == '2')
@@ -639,7 +719,7 @@ void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeig
 	cout << "---------------------------------------------------------" << endl << endl;
 
 }
-
+*/
 /*
 This function registers a mobile node with its home agent when the mobile node is in a 
 foreign network. Registration can be done by the foreign agent or directly by the mobile node.
@@ -666,7 +746,8 @@ NOTE: There is no need to deregister care-of-address when a mobile node leaves a
 network, because mobile node registering with a new foreign network takes care of this 
 automatically when the mobile node registers a new care-of-address.
 */
-void registerMN( mobileNode &m, homeAgent &h, foreignAgent &f )
+/*
+void registerMN( mobileNode &m, agent& a )
 {
 	// Display section title
 	cout << "---------------------------------------------------------" << endl;
@@ -674,7 +755,7 @@ void registerMN( mobileNode &m, homeAgent &h, foreignAgent &f )
 	cout << "---------------------------------------------------------" << endl;
 
 	// Display information
-	displayInformation(m, h, f);
+	displayInformation(m, h, f, 1);
 
 	// Create registration lifetime and ID
 	int lifetimeRequest = rand() % 8000 + 1999;
@@ -733,7 +814,7 @@ void registerMN( mobileNode &m, homeAgent &h, foreignAgent &f )
 	cout << "---------------------------------------------------------" << endl << endl;
 
 }
-
+*/
 /*
 The correspondent node sends datagrams addressed to the mobile nodes permanent IP address.
 The datagrams are routed to the mobile node's home network, where the home agent will 
@@ -742,7 +823,8 @@ agent of the mobile node specified in its binding table. The foreign agent then 
 decapsulated datagrams to the mobile node. The correspondent node is unaware that the mobile 
 node is located in a foreign network.
 */
-void indirectRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNode CN)
+/*
+void indirectRouting(mobileNode MN, agent A, correspondentNode CN)
 {
 	// Display section title
 	cout << "---------------------------------------------------------" << endl;
@@ -750,7 +832,7 @@ void indirectRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondent
 	cout << "---------------------------------------------------------" << endl;
   
 	// Display information
-	displayInformation(MN, HA, FA);
+	displayInformation(MN, HA, FA, 1);
 
 	// Initialize datagram
 	int sequenceNumber = rand() % 65536;
@@ -782,7 +864,7 @@ void indirectRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondent
 	// Print divisor for next section
 	cout << "---------------------------------------------------------" << endl << endl;
 }
-
+*/
 /*
 Direct routing solves the triangle routing problem, which is the inefficiency of sending
 datagrams to the home agent if the mobile node and correspondent node are in close proximity.
@@ -799,7 +881,8 @@ anchor agent the mobile node's new care-of-address. The correspondent node tunne
 addressed to the foreign anchor agent, who then forwards those datagrams to the mobile 
 node's new foreign agent.
 */
-void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNode CN)
+/*
+void directRouting(mobileNode MN, agent A, correspondentNode CN)
 {
 	// Display section title
 	cout << "---------------------------------------------------------" << endl;
@@ -807,7 +890,7 @@ void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNo
 	cout << "---------------------------------------------------------" << endl;
   
 	// Display information
-	displayInformation(MN, HA, FA);
+	displayInformation(MN, HA, FA, 1);
 
 	// Initialize datagram
 	int sequenceNumber = rand() % 65535;
@@ -922,3 +1005,4 @@ void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNo
 	// Print divisor for next section
 	cout << "---------------------------------------------------------" << endl << endl;
 }
+*/
