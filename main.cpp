@@ -621,6 +621,8 @@ void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeig
 		}
 		Sleep(sleepTime);	
 	
+	// Confirm Mobile Node received advertisement
+	cout << "Mobile Node received advertisement!" << endl;
 
 	// Check if function is not at home network	
 	if( homeOrForeign == 'F' || homeOrForeign == 'f')
@@ -794,10 +796,12 @@ agent to the home agent. After this initial query, the correspondent node can di
 tunnel datagrams to the mobile node's care-of-address. With this method, a foreign anchor
 agent is needed, since the mobile node's care-of-address is only queried once. The first
 foreign agent serves as the foreign anchor agent. This anchor is needed if the mobile node 
-moves to a different foreign network. Once the mobile node moves to a new foreign network,
-the foreign agent of that network sends the foreign anchor agent the mobile node's new 
-care-of-address. The correspondent node tunnels datagrams addressed to the foreign anchor 
-agent, who then forwards those datagrams to the mobile node's new foreign agent.
+moves to a different foreign network. Once the mobile node moves to a new foreign network, 
+it has to register with the new foreign agent before it can receive a new care-of-address. 
+After the mobile node is registered, the foreign agent of that network sends the foreign 
+anchor agent the mobile node's new care-of-address. The correspondent node tunnels datagrams
+addressed to the foreign anchor agent, who then forwards those datagrams to the mobile 
+node's new foreign agent.
 */
 void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNode CN)
 {
