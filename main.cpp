@@ -405,7 +405,7 @@ int main()
 	bool keepRunning = true;
 
 	// Display information
-	cout << "----------------------INFORMATION------------------------" << endl << endl;
+	cout << endl << "----------------------INFORMATION------------------------" << endl << endl;
 	cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
 	cout << "Home Agent address: " << HA.getHA() << endl;
 	HA.printEntries();
@@ -413,7 +413,7 @@ int main()
 	cout << "Foreign Agent address: " << FA.getFA() << endl;
 	FA.printEntries();
 	cout << endl;
-	cout << "----------------------INFORMATION------------------------" << endl << endl;
+	cout << "----------------------INFORMATION------------------------" << endl << endl << endl;
 
     // Display Main Menu
 	do {
@@ -541,7 +541,8 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 			advertisement.insertCOA(h.getHA());
 
 			// Print advertisement
-			cout << "Home Agent broadcasting advertisement... " << endl;
+			if( selection == '2') cout << "Home Agent UNICASTING advertisement... " << endl;
+			else cout << "Home Agent BROADCASTING advertisement... " << endl;
 			advertisement.printICMP();
 		}
 		// Otherwise, foreign network
@@ -552,7 +553,8 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 			advertisement.insertCOA(f.getFA());
 			
 			// Print advertisement
-			cout << "Foreign Agent broadcasting advertisement... " << endl;
+			if( selection == '2') cout << "Foreign Agent UNICASTING advertisement... " << endl;
+			else cout << "Foreign Agent BROADCASTING advertisement... " << endl;
 			advertisement.printICMP();
 		}
 		Sleep(2);	
@@ -576,7 +578,10 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 /* steps on page 568 */
 void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 {
-// TODO: IMPLEMENT REGISTRATION FUNCTIONS
+	// Display section title
+	cout << "---------------------------------------------------------" << endl;
+	cout << "                Registration with Home Agent             " << endl;
+	cout << "---------------------------------------------------------" << endl;
 
 	// Initialize variables
 //   registrationMessage regData(;
