@@ -21,6 +21,9 @@ Abstract: Mobile IP allows mobile devices to keep their same IP address when the
 
 using namespace std;
 
+// Global Variables
+const int sleepTime = 2;	// Sets amount of time between each simulator display message
+
 // Classes 
 /*
 The ICMP class is used during the agent discovery portion of mobile IP. Advertisements from
@@ -88,14 +91,14 @@ class registrationMessage
 		int getID(){ return id; }
 
 		void printRegistration(bool encapsulation)
-		{
-			if(encapsulation) cout << "[ENCAPSULATED] ";
+		{			
 			cout << "Registration(";
 			if(registerType == REQUEST) cout << "Request): ";
 			else cout << "Reply): ";			
 			if(COA != "") cout << "COA(" << COA << "), ";
 			cout << "HA(" << HAAddress << "), MA(" << MNAddress << "), Lifetime(" << lifeTime << "), ID(" << id << ")";			
-			cout << endl << endl;
+			if(encapsulation) cout << ", [Encapsulation Format]";	
+			cout << endl << endl << endl;
 		}
 
    private:
@@ -358,37 +361,36 @@ class datagram
 {
    public:
       // Constructor
-      datagram(string src, string dest, int time, int i)
-               :source(src), destination(dest), TTL(time), ID(i){}
+      datagram(string src, string dest, int i)
+               : source(src), destination(dest), sequenceNumber(i) {}
                
       // Member Functions
       string getSrc() { return source; }
       string getDest() { return destination; }
-      int getTTL() { return TTL; }
-      void print() {
 
-          cout << "Src: " << source << " Dest: " << destination << " TTL: " << TTL << " Id: " << ID << endl << endl;
-	  }
-	
-	  void decreaseTTL(){TTL--;}
+      void print(bool encapsulated, string encapDestination) 
+	  {
+		  if(encapsulated) cout << "[ENCAPSULATED Destination(" << encapDestination << ")] ";
+		  cout << "Datagram(" << sequenceNumber << "): Source(" << source;
+		  cout << "), Destination(" << destination << ")" << endl << endl << endl;
+	  }	
 
    private:
       // Members
-      string source;    // Source address
-      string destination;     // Destination address
-      int TTL;  // Lifetime of the registration entry
-      int ID;        // Identification number of the datagram      
+      string source;		   // Source address
+      string destination;      // Destination address
+      int sequenceNumber;	   // Identification number of the datagram      
 };
 
 // Function Prototype Declarations
 void Sleep(int);
 string generateIP();
 string generateMAC();
-void agentDiscovery(mobileNode&, homeAgent, foreignAgent, char);
-void registerMN(mobileNode, homeAgent, foreignAgent);
+void displayInformation(mobileNode, homeAgent, foreignAgent);
+void agentDiscovery(mobileNode, homeAgent, foreignAgent, char);
+void registerMN(mobileNode&, homeAgent, foreignAgent);
 void indirectRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
 void directRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
-void routeOptimization(mobileNode, correspondentNode);
 
 // Main Simulation
 int main()
@@ -455,6 +457,7 @@ int main()
 			cout << "2. Direct routing" << endl;
 			cout << "Enter a selection: ";
 			cin >> selection;
+			cout << endl;
 			switch(selection)
  			{
 				case '1':
@@ -521,6 +524,18 @@ string generateMAC()
 }
 
 /*
+Prints information of mobile node, home agent, foreign agent
+*/
+void displayInformation(mobileNode MN, homeAgent HA, foreignAgent FA)
+{
+	// Display information
+	cout << "Mobile Node IP: " << MN.getIP() << endl;
+	cout << "Home Agent address: " << HA.getHA() << endl;
+	cout << "Foreign Agent address: " << FA.getFA() << endl;
+	cout << "--------------------------------------" << endl << endl;
+}
+
+/*
 This function simulates the agent discovery section of mobile IP. Its purpose is to 
 discover home or foreign agents via agent advertisement. 
 
@@ -534,7 +549,7 @@ The second method is through solicitation, where the mobile node broadcasts an I
 specified with a type field of 10. When an agent receives the ICMP message, it unicasts an
 agent advertisement to that mobile node.
 */
-void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForeign)
+void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeign)
 {
 	// Select method (advertisement or solicitation)
 	char selection;
@@ -559,6 +574,9 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 		cout << endl;
 	} while(keepRunning);
 
+	// Display information
+	displayInformation(m, h, f);
+
 	// Solicitation
 	if(selection == '2')
 	{
@@ -568,13 +586,13 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 		// Mobile node broadcast ICMP message to agent in network
 		cout << "Mobile Node broadcasting solicitation..." << endl;
 		solicitation.printICMP();
-		Sleep(2);
+		Sleep(sleepTime);
 	}
 
 	// Advertisement
 		// Listen for broadcast
 		cout << "Mobile Node listening for Home Agent or Foreign Agent advertisement..." << endl << endl;
-		Sleep(2);
+		Sleep(sleepTime);
 
 		// Agent broadcast ICMP message/advertisement
 		// If home network
@@ -601,7 +619,7 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 			else cout << "Foreign Agent BROADCASTING advertisement... " << endl;
 			advertisement.printICMP();
 		}
-		Sleep(2);	
+		Sleep(sleepTime);	
 	
 
 	// Check if function is not at home network	
@@ -609,14 +627,17 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
     {    
        // Confirm Mobile Node is in foreign network
        cout << "Mobile Node is in foreign network!" << endl << endl;
-       Sleep(2);
+       Sleep(sleepTime);
 	}
 
 	// Otherwise, mobile IP is not needed
     else cout << "Mobile Node is in home network, no need for Mobile IP!" << endl;
 
 	// Print divisor for next section
+	cout << "---------------------------------------------------------" << endl;
+	system("PAUSE");
 	cout << "---------------------------------------------------------" << endl << endl;
+
 }
 
 /*
@@ -645,17 +666,20 @@ NOTE: There is no need to deregister care-of-address when a mobile node leaves a
 network, because mobile node registering with a new foreign network takes care of this 
 automatically when the mobile node registers a new care-of-address.
 */
-void registerMN( mobileNode m, homeAgent h, foreignAgent f )
+void registerMN( mobileNode &m, homeAgent h, foreignAgent f )
 {
 	// Display section title
 	cout << "---------------------------------------------------------" << endl;
 	cout << "                Registration with Home Agent             " << endl;
 	cout << "---------------------------------------------------------" << endl;
-         
+
+	// Display information
+	displayInformation(m, h, f);
+
 	// Create registration lifetime and ID
-	int lifetimeRequest = rand() % 800 + 199;
-	int lifetimeReply = lifetimeRequest - rand() % 199;
-	int registrationId = rand() % 999;
+	int lifetimeRequest = rand() % 8000 + 1999;
+	int lifetimeReply = lifetimeRequest - rand() % 1999;
+	int registrationId = rand() % 9999;
 
     // MN: send request to foreign agent
   	    // Set COA for mobile node
@@ -665,46 +689,51 @@ void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 		registrationMessage request(REQUEST, m.getCOA(), h.getHA(), m.getIP(), lifetimeRequest, registrationId);
 	    cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl;
 		request.printRegistration(false);
-		cout << endl;
-	    Sleep(2);
+	    Sleep(sleepTime);
 
     // FA: update visitor list
+	cout << "Foreign Agent: Received registration request!" << endl;
     cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
-    Sleep(2);
+    Sleep(sleepTime);
     f.addEntry(m.getIP(), h.getHA(), m.getMAC(), lifetimeRequest);
     f.printEntries();
     cout << endl << "Visitor List is updated!" << endl << endl << endl;
-    Sleep(3);
+    Sleep(sleepTime);
 
     // FA: forward request to home agent
     cout << "Foreign Agent: Forwarding registration request to Home Agent..." << endl;
     request.printRegistration(true);
-	cout << endl;
-	Sleep(2);
+	Sleep(sleepTime);
             
     // HA: update binding table
+	cout << "Home Agent: Received registration request!" << endl;
     cout << "Home Agent: Updated Mobile Binding Table..." << endl << endl;
-    Sleep(2);
+    Sleep(sleepTime);
     h.addEntry(m.getIP(), f.getFA(), lifetimeReply);
     h.printEntries();
     cout << endl << "Mobile Binding Table is updated!" << endl << endl << endl;
-    Sleep(3);
+    Sleep(sleepTime);
 
 	// HA: send reply to foreign agent
 		// Initialize registration REPLY
 		registrationMessage reply(REPLY, "", h.getHA(), m.getIP(), lifetimeReply, registrationId);
 		cout << "Home Agent: Sending registration reply to Foreign Agent..." << endl;
 		reply.printRegistration(true);
-		cout << endl;
-		Sleep(2);
+		Sleep(sleepTime);
             
     // FA: relay reply to mobile node
+	cout << "Foreign Agent: Received registration reply!" << endl;
     cout << "Foreign Agent: Forwarding registration reply to Mobile Node..." << endl;
 	reply.printRegistration(false);
-    Sleep(2);   
+
+	// MN: Show received message
+	cout << "Mobile Node: Received registration reply!" << endl;
 
 	// Print divisor for next section
+	cout << "---------------------------------------------------------" << endl;
+	system("PAUSE");
 	cout << "---------------------------------------------------------" << endl << endl;
+
 }
 
 /*
@@ -715,38 +744,41 @@ agent of the mobile node specified in its binding table. The foreign agent then 
 decapsulated datagrams to the mobile node. The correspondent node is unaware that the mobile 
 node is located in a foreign network.
 */
-void indirectRouting(mobileNode MN,homeAgent HA, foreignAgent FA,correspondentNode CN)
+void indirectRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNode CN)
 {
 	// Display section title
 	cout << "---------------------------------------------------------" << endl;
 	cout << "               Indirect Routing of Datagrams             " << endl;
 	cout << "---------------------------------------------------------" << endl;
   
-	// Send datagram from correspondent node to home agent
-	cout << "Sending packet from Mobile Node to Foreign Agent" << endl << endl;
+	// Display information
+	displayInformation(MN, HA, FA);
 
-	datagram originalDatagram(MN.getIP(), FA.getFA(), 15, rand() % 65536);
+	// Initialize datagram
+	int sequenceNumber = rand() % 65536;
+	datagram data(CN.getIP(), MN.getIP(), sequenceNumber);
 
-	// print and update datagram
-	originalDatagram.print();
-	originalDatagram.decreaseTTL();
+	// CN: Send datagram from to mobile node
+	cout << "Correspondent: Sending datagram to Mobile Node (Home Agent)..." << endl;	
+	data.print(false, "");
+	Sleep(sleepTime);
 
-	// Encapsulate orignal datagram and send to Home Agent
-	cout << "Foreign Agent recieved packet, sending encapsulated packet to Home Agent" << endl << endl;
+	// HA: Send encapsulated datagram to mobile node's care-of-address
+	cout << "Home Agent: Intercepted datagram sent to Mobile Node!" << endl;
+	cout << "Home Agent: Looking up Mobile Node's care-of-address in binding table..." << endl;
+	Sleep(sleepTime);
+	cout << "Home Agent: Mobile Node(" << MN.getIP() << ")'s care-of-address found!" << endl;
+	cout << "Home Agent: Sending datagram to care-of-address " << MN.getCOA() << "..." << endl;
+	data.print(true, MN.getCOA());
+	Sleep(sleepTime);
 
-	datagram encapsDatagram(FA.getFA(), HA.getHA(), 15, rand() % 65536);
+	// FA: Forward decapsulated datagram to mobile node
+	cout << "Foreign Agent: Received encapsulated datagram sent to Mobile Node!" << endl;
+	cout << "Foreign Agent: Forwarding decapsulated datagram to Mobile Node..." << endl;
+	data.print(false, "");
 
-	// print information
-	encapsDatagram.print();
-
-	// send from Home Agent to Correspondent Node
-	cout << "Home Agent recieved packet, sending original packet to Correspondent Node" << endl << endl;
-
-	// print information
-	originalDatagram.print();
-
-	// packet arrived
-	cout << "Correspondent Node recieved packet" << endl << endl;
+	// MN: Show received message
+	cout << "Mobile Node: Received Correspondent's datagram!" << endl;
 
 	// Print divisor for next section
 	cout << "---------------------------------------------------------" << endl << endl;
@@ -766,20 +798,128 @@ the foreign agent of that network sends the foreign anchor agent the mobile node
 care-of-address. The correspondent node tunnels datagrams addressed to the foreign anchor 
 agent, who then forwards those datagrams to the mobile node's new foreign agent.
 */
-void directRouting(mobileNode MN,homeAgent HA, foreignAgent FA,correspondentNode CN)
+void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNode CN)
 {
 	// Display section title
 	cout << "---------------------------------------------------------" << endl;
 	cout << "                Direct Routing of Datagrams              " << endl;
 	cout << "---------------------------------------------------------" << endl;
   
-	// send Datagram directly to Correspondent Node using permanent home address
+	// Display information
+	displayInformation(MN, HA, FA);
 
-	cout << "Mobile Node sending datagram to Correspondent Node using permanent home address" << endl << endl;
+	// Initialize datagram
+	int sequenceNumber = rand() % 65535;
+	datagram data(CN.getIP(), MN.getIP(), sequenceNumber);
 
-	datagram newDatagram(MN.getIP(), CN.getIP(), 15, rand() % 65536);
+	// Correspondent Agent: Query Home Agent for Mobile Node's care-of-address
+	cout << "Correspondent Agent: Querying Home Agent for Mobile Node's care-of-address..." << endl << endl << endl;
+	Sleep(sleepTime);
 
-	newDatagram.print();
+	// Home Agent: Respond to Correspondent Agent with Mobile Node's care-of-address
+	cout << "Home Agent: Looking up Mobile Node's care-of-address in binding table..." << endl;
+	Sleep(sleepTime);
+	cout << "Home Agent: Mobile Node(" << MN.getIP() << ")'s care-of-address found!" << endl;
+	cout << "Home Agent: Responding to query with Mobile Node's care-of-address(" << MN.getCOA() << ")..." << endl << endl << endl;
+	Sleep(sleepTime);
+
+	// Correspondent Agent: Send encapsulated datagram to care-of-address (tunneling)
+	cout << "Correspondent Agent: Tunneling datagram to Mobile Node's care-of-address..." << endl;
+	data.print(true, MN.getCOA());
+	Sleep(sleepTime);
+
+	// FA: Forward decapsulated datagram to mobile node
+	cout << "Foreign Agent: Received encapsulated datagram sent to Mobile Node!" << endl;
+	cout << "Foreign Agent: Forwarding decapsulated datagram to Mobile Node..." << endl;
+	data.print(false, "");
+
+	// MN: Show received message
+	cout << "Mobile Node: Received Correspondent's datagram!" << endl;
+	cout << "Mobile Node: Moving to new foreign network!" << endl << endl << endl;
+
+	// System pause
+	system("PAUSE");
+	cout << endl << endl;
+
+	// Mobile Node moves to new foreign network
+		// Initialize new foreign agent and ICMP advertisement message
+		foreignAgent newFA(generateIP());
+		ICMP advertisement(ADVERTISEMENT, newFA.getFA(), false, true, true);
+		advertisement.insertCOA(newFA.getFA());
+		int lifetimeRequest = rand() % 9999;
+		int registrationId = rand() % 9999;
+		datagram data2(CN.getIP(), MN.getIP(), sequenceNumber + 1);
+
+		// Agent discovery
+			// Listen for broadcast
+			cout << "           Agent Discovery           " << endl;
+			cout << "-------------------------------------" << endl;
+			cout << "Mobile Node is in new foreign network!" << endl;
+			cout << "Mobile Node listening for Home Agent or Foreign Agent advertisement..." << endl << endl << endl;
+			Sleep(sleepTime);
+
+			// Foreign Agent broadcast advertisement
+			cout << "Foreign Agent BROADCASTING advertisement... " << endl;
+			advertisement.printICMP();
+			Sleep(sleepTime);
+
+			// Confirm Mobile Node is in new foreign network
+		   cout << "Mobile Node received Foreign Agent broadcast!" << endl << endl << endl;
+
+		// Registration
+			// MN: send request to foreign agent
+				// Set new COA for mobile node
+				MN.setCOA(newFA.getFA());
+
+				// Initialize registration REQUEST
+				registrationMessage request(REQUEST, MN.getCOA(), HA.getHA(), MN.getIP(), lifetimeRequest, registrationId);
+
+				// MN: Send registration request to FA
+				cout << "             Registration            " << endl;
+				cout << "-------------------------------------" << endl;
+				cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl;
+				request.printRegistration(false);
+				Sleep(sleepTime);
+
+			// FA: update visitor list
+			cout << "Foreign Agent: Received registration request!" << endl;
+			cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
+			Sleep(sleepTime);
+			newFA.addEntry(MN.getIP(), HA.getHA(), MN.getMAC(), lifetimeRequest);
+			newFA.printEntries();
+
+			// Confirm Mobile Node is registered with new Foreign Agent
+			cout << endl << "Visitor List is updated!" << endl;
+			cout << "Mobile Node registered with new Foreign Agent!" << endl << endl << endl;
+			Sleep(sleepTime);
+
+			// New FA: Send Mobile Node's new care-of-address to Anchor Foreign Agent
+			cout << "New Foreign Agent: Sending Anchor Foreign Agent the Mobile Node's new care-of-address(" << MN.getCOA() << ")..." << endl;
+			Sleep(sleepTime);
+
+			// Confirm Anchor Foreign Agent has received new care-of-address
+			cout << "Anchor Foreign Agent: Received Mobile Node's new care-of-address!" << endl << endl << endl;
+
+		// Correspondent Agent: Send encapsulated datagram to care-of-address (tunneling)
+		cout << "               Routing               " << endl;
+		cout << "-------------------------------------" << endl;
+		cout << "Correspondent Agent: Tunneling datagram to Mobile Node's care-of-address..." << endl;
+		data2.print(true, FA.getFA());
+		Sleep(sleepTime);
+
+		// FA Anchor: Forward datagram to new Foreign Agent
+		cout << "Anchor Foreign Agent: Received encapsulated datagram sent to Mobile Node!" << endl;
+		cout << "Anchor Foreign Agent: Forwarding datagram to new Foreign Agent..." << endl;
+		data2.print(true, MN.getCOA());
+		Sleep(sleepTime);
+
+		// New FA: Forward decapsulated datagram to mobile node
+		cout << "New Foreign Agent: Received encapsulated datagram sent to Mobile Node!" << endl;
+		cout << "New Foreign Agent: Forwarding decapsulated datagram to Mobile Node..." << endl;
+		data.print(false, "");
+
+		// MN: Show received message
+		cout << "Mobile Node: Received Correspondent's datagram!" << endl;
 
 	// Print divisor for next section
 	cout << "---------------------------------------------------------" << endl << endl;
