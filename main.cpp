@@ -385,7 +385,7 @@ class networkLayer
 void Sleep(int);
 string generateIP();
 string generateMAC();
-bool agentDiscovery(mobileNode&, homeAgent, foreignAgent, char);
+void agentDiscovery(mobileNode&, homeAgent, foreignAgent, char);
 void registerMN(mobileNode, homeAgent, foreignAgent);
 void reverseTunnel(mobileNode, homeAgent, foreignAgent, correspondentNode);
 void routeOptimization(mobileNode, correspondentNode);
@@ -405,7 +405,7 @@ int main()
 	bool keepRunning = true;
 
 	// Display information
-	cout << "---------------------INFORMATION------------------------" << endl << endl;
+	cout << "----------------------INFORMATION------------------------" << endl << endl;
 	cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
 	cout << "Home Agent address: " << HA.getHA() << endl;
 	HA.printEntries();
@@ -413,7 +413,7 @@ int main()
 	cout << "Foreign Agent address: " << FA.getFA() << endl;
 	FA.printEntries();
 	cout << endl;
-	cout << "---------------------INFORMATION------------------------" << endl << endl;
+	cout << "----------------------INFORMATION------------------------" << endl << endl;
 
     // Display Main Menu
 	do {
@@ -490,14 +490,15 @@ string generateMAC()
    return MAC;
 }
 
-bool agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForeign)
+void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForeign)
 {
 	// Select method (advertisement or solicitation)
 	char selection;
 	bool keepRunning = true;
 	do {
-		cout << "Agent Discovery" << endl;
-		cout << "---------------" << endl;
+		cout << "---------------------------------------------------------" << endl;
+		cout << "                     Agent Discovery                     " << endl;
+		cout << "---------------------------------------------------------" << endl;
 		cout << "1. Advertisement" << endl;
 		cout << "2. Solicitation" << endl;
 		cout << "Enter agent discovery method: ";
@@ -569,7 +570,7 @@ bool agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
     else cout << "Mobile Node is in home network, no need for Mobile IP!" << endl;
 
 	// Print divisor for next section
-	cout << "-------------------------------------------------------" << endl << endl;
+	cout << "---------------------------------------------------------" << endl << endl;
 }
 
 /* steps on page 568 */
