@@ -22,7 +22,7 @@ Abstract: Mobile IP allows mobile devices to keep their same IP address when the
 using namespace std;
 
 // Global Variables
-const int sleepTime = 2;	// Sets amount of time between each simulator display message
+const int sleepTime = 0;	// Sets amount of time between each simulator display message
 
 // Classes 
 /*
@@ -388,7 +388,7 @@ string generateIP();
 string generateMAC();
 void displayInformation(mobileNode, homeAgent, foreignAgent);
 void agentDiscovery(mobileNode, homeAgent, foreignAgent, char);
-void registerMN(mobileNode&, homeAgent, foreignAgent);
+void registerMN(mobileNode&, homeAgent&, foreignAgent&);
 void indirectRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
 void directRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
 
@@ -666,7 +666,7 @@ NOTE: There is no need to deregister care-of-address when a mobile node leaves a
 network, because mobile node registering with a new foreign network takes care of this 
 automatically when the mobile node registers a new care-of-address.
 */
-void registerMN( mobileNode &m, homeAgent h, foreignAgent f )
+void registerMN( mobileNode &m, homeAgent &h, foreignAgent &f )
 {
 	// Display section title
 	cout << "---------------------------------------------------------" << endl;
@@ -767,7 +767,8 @@ void indirectRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondent
 	cout << "Home Agent: Intercepted datagram sent to Mobile Node!" << endl;
 	cout << "Home Agent: Looking up Mobile Node's care-of-address in binding table..." << endl;
 	Sleep(sleepTime);
-	cout << "Home Agent: Mobile Node(" << MN.getIP() << ")'s care-of-address found!" << endl;
+	HA.printEntries();
+	cout << endl << "Home Agent: Mobile Node's care-of-address found!" << endl;
 	cout << "Home Agent: Sending datagram to care-of-address " << MN.getCOA() << "..." << endl;
 	data.print(true, MN.getCOA());
 	Sleep(sleepTime);
@@ -819,8 +820,9 @@ void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNo
 	// Home Agent: Respond to Correspondent Agent with Mobile Node's care-of-address
 	cout << "Home Agent: Looking up Mobile Node's care-of-address in binding table..." << endl;
 	Sleep(sleepTime);
-	cout << "Home Agent: Mobile Node(" << MN.getIP() << ")'s care-of-address found!" << endl;
-	cout << "Home Agent: Responding to query with Mobile Node's care-of-address(" << MN.getCOA() << ")..." << endl << endl << endl;
+	HA.printEntries();
+	cout << endl << "Home Agent: Mobile Node's care-of-address found!" << endl;
+	cout << "Home Agent: Responding to query with Mobile Node's care-of-address " << MN.getCOA() << "..." << endl << endl << endl;
 	Sleep(sleepTime);
 
 	// Correspondent Agent: Send encapsulated datagram to care-of-address (tunneling)
@@ -883,7 +885,7 @@ void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNo
 
 			// FA: update visitor list
 			cout << "Foreign Agent: Received registration request!" << endl;
-			cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
+			cout << "Foreign Agent: Updating new Visitor List..." << endl << endl;
 			Sleep(sleepTime);
 			newFA.addEntry(MN.getIP(), HA.getHA(), MN.getMAC(), lifetimeRequest);
 			newFA.printEntries();
@@ -894,7 +896,7 @@ void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNo
 			Sleep(sleepTime);
 
 			// New FA: Send Mobile Node's new care-of-address to Anchor Foreign Agent
-			cout << "New Foreign Agent: Sending Anchor Foreign Agent the Mobile Node's new care-of-address(" << MN.getCOA() << ")..." << endl;
+			cout << "New Foreign Agent: Sending Anchor Foreign Agent the Mobile Node's new care-of-address " << MN.getCOA() << "..." << endl;
 			Sleep(sleepTime);
 
 			// Confirm Anchor Foreign Agent has received new care-of-address
