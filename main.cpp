@@ -44,7 +44,7 @@ void Sleep(int);
 string generateIP();
 string generateMAC();
 
-void displayInformation(mobileNode, agent, int);
+void displayInformation(mobileNode[], int, agent[], int);
 void configuration(ICMP_t&, routingMethod&, int&, int&);
 void agentDiscovery(mobileNode, agent, char);
 void registerMN(mobileNode&, agent&);
@@ -144,15 +144,12 @@ class mobileNode
 {
    public:
       // Constructor
-	  mobileNode() { IP = generateIP(); MAC = generateMAC(); COA = ""; }
+	  mobileNode() { IP = ""; MAC = generateMAC(); COA = ""; }
       
       // Member Functions
       string getIP() { return IP; }
 	  void setIP(string address, mobileNode a[], int size) 
 	  { 
-		  IP = address.replace(address.find_last_of("."), 4, "." + to_string(rand() % 254 + 1)); 
-// TODO: FIX FUNCTION BELOW SO THERE ARE NO DUPLICATE IPs		 
-/*
 		bool flag;
 		do
 		{
@@ -160,11 +157,10 @@ class mobileNode
 		  IP = address.replace(address.find_last_of("."), 4, "." + to_string(rand() % 254 + 1)); 
 		  for(int i=0;i<size;i++)
 		  {
-			  if(IP == a[i].getIP()) flag = true;			
-			  cout << "IN LOOP " << i << endl;
+			  if(IP == a[i].getIP()) flag = true;
 		  }
 		} while(flag);
-*/	  
+	  
 	  }
       string getMAC() { return MAC; }
 	  void setCOA(string careOfAddress) { COA = careOfAddress; }
@@ -184,7 +180,7 @@ class correspondentNode
 {
 	public: 
 		// Constructor
-		correspondentNode(string internetProtocol) {IP = internetProtocol; }
+		correspondentNode(string internetProtocol) { IP = internetProtocol; }
 
 		// Member Functions
 		string getIP()  { return IP; }
@@ -211,7 +207,14 @@ class agent
       
       // Member Functions
       string getAddress() { return address; }
-	  bool isHome(string IP) { if(IP == address.substr(address.find_last_of("."))); }
+	  bool isHome(string IP) 
+	  { 
+		  // If the first sections of the IP address are the same, the mobile node is in its home network
+		  if(IP.substr(0, address.find_last_of(".")) == address.substr(0, address.find_last_of("."))) return true; 
+		  
+		  // Otherwise, return false
+		  else return false; 
+	  }
 
       void addBindingEntry(string home, string coa, int time)
       {
@@ -411,21 +414,14 @@ int main()
 		// Initialize mobile nodes, home agents, foreign agents
 		mobileNode* mnArray = new mobileNode[numMN];
 		agent* agentArray = new agent[numAgents];
+			// Assign mobile nodes to home networks
+			for(int i=0;i<numMN;i++)
+			{
+				mnArray[i].setIP(agentArray[rand() % numAgents].getAddress(), mnArray, i);
+			}
 
-		cout << "Mobile Nodes" << endl;
-		for(int i=0;i<numMN;i++)
-		{
-			mnArray[i].setIP(agentArray[rand()%numAgents].getAddress(), mnArray, numMN);
-			cout << mnArray[i].getIP() << endl;
-		}
-
-		cout << endl << "Agents" << endl;
-		for(int i=0;i<numAgents;i++)
-		{
-			cout << agentArray[i].getAddress() << endl;
-		}
-		// Display mobile node, home agent, foreign agent information
-//		displayInformation(MN, HA, FA, 2);
+		// Display mobile nodes, and home networks
+		displayInformation(mnArray, numMN, agentArray, numAgents);
 
 	} while(false);
 
@@ -518,33 +514,22 @@ string generateMAC()
 /*
 Prints information of mobile node, home agent, foreign agent
 */
-/*
-void displayInformation(mobileNode MN, agent A, int menu)
+
+void displayInformation(mobileNode m[], int numMobile, agent a[], int numAgents)
 {
-	if( menu == 1)
+	
+	// Display information
+	for(int i=0; i<numAgents; i++)
 	{
-		// Display information
-		cout << "Mobile Node IP: " << MN.getIP() << endl;
-		cout << "Home Agent address: " << HA.getHA() << endl;
-		cout << "Foreign Agent address: " << FA.getFA() << endl;
+		cout << "Home Agent address: " << a[i].getAddress() << endl;
+		for(int j=0; j<numMobile; j++)
+		{
+			if(a[i].isHome(m[j].getIP())) cout << "Mobile Node IP: " << m[j].getIP() << endl;
+		}
 		cout << "--------------------------------------" << endl << endl;
 	}
-
-	else
-	{
-		// Display information
-		cout << endl << "----------------------INFORMATION------------------------" << endl << endl;
-		cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
-		cout << "Home Agent address: " << HA.getHA() << endl;
-		HA.printEntries();
-		cout << endl;
-		cout << "Foreign Agent address: " << FA.getFA() << endl;
-		FA.printEntries();
-		cout << endl;
-		cout << "----------------------INFORMATION------------------------" << endl << endl << endl;
-	}
 }
-*/
+
 void configuration(ICMP_t& agentDiscovery, routingMethod& r, int& numMN, int& numA)
 {
 	// Initialize variables
