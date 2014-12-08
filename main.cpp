@@ -8,6 +8,73 @@
 using namespace std;
 
 // Classes 
+enum ICMP_t { ADVERTISEMENT, SOLICITATION }; // advertisement is type 9, solicitation is type 10
+class ICMP
+{
+	public:
+		// Constructor
+		ICMP( ICMP_t t, string i, bool home, bool foreign, bool registration )
+			: type(t), IP(i), H(home), F(foreign), R(registration) {}
+
+		// Member Functions
+		void insertCOA(string careOfAddress)
+		{
+			COA.push_front(careOfAddress);
+		}
+
+		string getCOA()
+		{
+			string address = COA.front();
+			COA.pop_front();
+			return address;
+		}
+
+		void printICMP()
+		{
+			cout << "ICMP: Type(";
+			if(type == ADVERTISEMENT) cout << "9/ADVERTISEMENT";
+			else cout << "10/SOLICITATION";
+			cout << "), IP(" << IP << "), H(" << H << "), F(" << F << "), R(" << R << ")" << endl << endl;
+		}
+
+	private:
+		// Data members
+		ICMP_t type;		// ADVERTISEMENT or SOLICITATION
+		string IP;			// IP address
+		bool H;				// Home agent bit
+		bool F;				// Foreign agent bit
+		bool R;				// Registration required bit
+		list<string> COA;	// List of available Care-of-Addresses in foreign network
+};
+
+enum registration_t { REQUEST, REPLY };
+class registrationMessage
+{
+   public:
+	    // Constructor
+		registrationMessage( registration_t type, string c, string h, string m, string e, int l, int i )
+			: registerType(type), COA(c), HAAddress(h), MNAddress(m), EncapFormat(e), lifeTime(l), id(i) {}
+
+		// Member Functions
+		registration_t getRegisterType() { return registerType; }
+		string getCOA(){ return COA; }
+		string getHAAddress(){ return HAAddress; }
+		string getMNAddress(){ return MNAddress; }
+		string getEncapFormat(){ return EncapFormat; }
+		int getLifetime(){ return lifeTime; }
+		int getID(){ return id; }
+
+   private:
+	   // Data Members
+   	   registration_t registerType; // REQUEST or REPLY
+	   string COA;					// Care-of-Address of mobile node in foreign network
+	   string HAAddress;			// Home agent address
+	   string MNAddress;			// Mobile node permanent address
+	   string EncapFormat;			// encapsulation format
+	   int lifeTime;				// Lifetime of requested registration
+	   int id;						// 64-bit ID of message (Acts like sequence number to match REQUEST/REPLY)
+};
+
 class mobileNode
 {
    public:
@@ -17,6 +84,8 @@ class mobileNode
       // Member Functions
       string getIP() { return IP; }
       string getMAC() { return MAC; }
+	  void setCOA(string careOfAddress) { COA = careOfAddress; }
+	  string getCOA() { return COA; }
 
       void sendRequest( registrationMessage &msg )
       {
@@ -32,6 +101,7 @@ class mobileNode
       // Members
       string IP;   // This is the permanent IP of the MN's home address 
       string MAC;
+	  string COA;  // Care-of-Address/current location of mobile node
 };
 
 class correspondentNode
@@ -122,32 +192,29 @@ class homeAgent
       // Member Functions
       void printSpaceAndBar(string IP)
       {
-	 for (unsigned i = 0; i < (15 - IP.length()); i++)
-		cout << " ";
-	 cout << " | ";
+		for (unsigned i = 0; i < (15 - IP.length()); i++) cout << " ";
+		cout << " | ";
       }
        
       void printLifeTime(int val)
       {
-	 int leftSpace = 6;
-	 int rightSpace = 6;
-	 int v = val / 10;
-	 while (v > 0)
-	 {
-		if (leftSpace == rightSpace)
-			leftSpace--;
-		else
-			rightSpace--;
+		int leftSpace = 6;
+		int rightSpace = 6;
+		int v = val / 10;
+		while (v > 0)
+		{
+			if (leftSpace == rightSpace)
+				leftSpace--;
+			else
+				rightSpace--;
 
-		v /= 10;
- 	 }
+			v /= 10;
+ 		}
 
-	 for (int i = 0; i < leftSpace; i++)
-	 	cout << " ";
-	 cout << val;
- 	 for (int i = 0; i < rightSpace; i++)
-		cout << " ";
-	}
+		for (int i = 0; i < leftSpace; i++)	cout << " ";
+		cout << val;
+ 		for (int i = 0; i < rightSpace; i++) cout << " ";
+	 }
 
       // Data Members
       string HAAddress;                // Home Agent address
@@ -236,32 +303,29 @@ class foreignAgent
       // Member Functions
       void printSpaceAndBar(string IP)
       {
-	 for (unsigned i = 0; i < (15 - IP.length()); i++)
-		cout << " ";
-	 cout << " | ";
+		for (unsigned i = 0; i < (15 - IP.length()); i++) cout << " ";
+		cout << " | ";
       }
       
       void printLifeTime(int val)
       {
-	 int leftSpace = 6;
-	 int rightSpace = 6;
-	 int v = val / 10;
-	 while (v > 0)
-	 {
-		if (leftSpace == rightSpace)
+		int leftSpace = 6;
+		int rightSpace = 6;
+		int v = val / 10;
+		while (v > 0)
+		{
+			if (leftSpace == rightSpace)
 			leftSpace--;
-		else
+			else
 			rightSpace--;
 
-		v /= 10;
- 	 }
+			v /= 10;
+ 		}
 
-	 for (int i = 0; i < leftSpace; i++)
-	 	cout << " ";
-	 cout << val;
- 	 for (int i = 0; i < rightSpace; i++)
-		cout << " ";
-	}
+		for (int i = 0; i < leftSpace; i++)	cout << " ";
+		cout << val;
+ 		for (int i = 0; i < rightSpace; i++) cout << " ";
+	  }
       
       // Data Members
       string FAAddress;               // Foreign Agent address
@@ -294,30 +358,6 @@ class datagram
       int ID;        // Identification number of the datagram      
 };
 
-class registrationMessage
-{
-   public:
-	registerData( string type, string c, string h, string m, string e, int l, int i )
-		: registerType(type), COA(c), HAAddress(h), MNAddress(m), EncapFormat(e), lifeTime(l), id(i){}
-
-	string getRegisterType() { return registerType };
-	string getCOA(){ return COA };
-	string getHAAddress(){ return HAAddress };
-	string getMNAddress(){ return MNAddress };
-	string getEncapFormat(){ return EncapFormat };
-	int getLifetime(){ return lifeTime };
-	int getID(){ return id };
-
-   private:
-   	   string registerType; // REQUEST or REPLY
-	   string COA;
-	   string HAAddress;
-	   string MNAddress;
-	   string EncapFormat; // encapsulation
-	   int lifeTime
-	   int id;
-};
-
 /*
 class applicationLayer
 {
@@ -345,6 +385,7 @@ class networkLayer
 void Sleep(int);
 string generateIP();
 string generateMAC();
+bool agentDiscovery(mobileNode&, homeAgent, foreignAgent, char);
 void registerMN(mobileNode, homeAgent, foreignAgent);
 void reverseTunnel(mobileNode, homeAgent, foreignAgent, correspondentNode);
 void routeOptimization(mobileNode, correspondentNode);
@@ -352,39 +393,61 @@ void routeOptimization(mobileNode, correspondentNode);
 // Main Simulation
 int main()
 {
-   srand((unsigned int) time(NULL));
+	// Seed time
+	srand((unsigned int) time(NULL));
    
-   // Initialize objects
-   mobileNode MN(generateIP(), generateMAC());
-   homeAgent HA(generateIP());
-   foreignAgent FA(generateIP());
-   correspondentNode CN(generateIP());
-   
-cout << "Mobile Node IP: " << MN.getIP() << endl;
-cout << "Home Agent address: " << HA.getHA() << endl;
-HA.printEntries();
-cout << endl;
-cout << "Foreign Agent address: " << FA.getFA() << endl;
-FA.printEntries();
-cout << endl;
+    // Initialize objects
+    mobileNode MN(generateIP(), generateMAC());
+    homeAgent HA(generateIP());
+    foreignAgent FA(generateIP());
+    correspondentNode CN(generateIP());
+	char selection;
+	bool keepRunning = true;
 
-   // Display Main Menu
-   cout << "            Mobile IP            " << endl;
-   cout << "---------------------------------" << endl;
-/*
-   cout << "1. Mobile Node in Home Network" << endl;
-   cout << "2. Mobile Node in Foreign Network" << endl;
-   cout << "Enter your selection: ";
-   cin >> selection;
-*/
-  
-   
-   // Register Mobile Node to Host Agent
-   registerMN( MN, HA, FA );   
+	// Display information
+	cout << "---------------------INFORMATION------------------------" << endl << endl;
+	cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
+	cout << "Home Agent address: " << HA.getHA() << endl;
+	HA.printEntries();
+	cout << endl;
+	cout << "Foreign Agent address: " << FA.getFA() << endl;
+	FA.printEntries();
+	cout << endl;
+	cout << "---------------------INFORMATION------------------------" << endl << endl;
 
-   routeOptimization(MN, CN);
+    // Display Main Menu
+	do {
+		cout << "---------------------------------------------------------" << endl;
+		cout << "                        Mobile IP                        " << endl;
+	    cout << "---------------------------------------------------------" << endl;
+	    cout << "Select if mobile node is in (H)ome or (F)oreign network: ";
+	    cin >> selection;
+	    switch(selection)
+ 		{
+			case 'H':
+			case 'h':
+			case 'F':
+			case 'f':
+				keepRunning = false;
+				break;
+			default:
+				cout << endl << "Incorrect input, try again!";		
+		}
+		cout << endl;
+	} while(keepRunning);
+
+    // Agent Discovery
+    agentDiscovery(MN, HA, FA, selection);
    
-   return 0;
+	// If mobile node is in foreign network
+    if(selection == 'F' || selection == 'f')
+    {
+	    // Register Mobile Node to Host Agent
+	    registerMN( MN, HA, FA );   
+
+	    routeOptimization(MN, CN);
+    }
+    return 0;
 }
 
 // Function Implementation
@@ -427,63 +490,130 @@ string generateMAC()
    return MAC;
 }
 
+bool agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForeign)
+{
+	// Select method (advertisement or solicitation)
+	char selection;
+	bool keepRunning = true;
+	do {
+		cout << "Agent Discovery" << endl;
+		cout << "---------------" << endl;
+		cout << "1. Advertisement" << endl;
+		cout << "2. Solicitation" << endl;
+		cout << "Enter agent discovery method: ";
+		cin >> selection;
+		switch(selection)
+		{
+			case '1':
+			case '2':
+				keepRunning = false;
+				break;
+			default:
+				cout << endl << "Incorrect input, try again!";		
+		}
+		cout << endl;
+	} while(keepRunning);
+
+	// Solicitation
+	if(selection == '2')
+	{
+		// Initialize ICMP solicitation message
+		ICMP solicitation(SOLICITATION, m.getIP(), false, false, false);
+
+		// Mobile node broadcast ICMP message to agent in network
+		cout << "Mobile Node broadcasting solicitation..." << endl;
+		solicitation.printICMP();
+		Sleep(2);
+	}
+
+	// Advertisement
+		// Listen for broadcast
+		cout << "Mobile Node listening for Home Agent or Foreign Agent advertisement..." << endl << endl;
+		Sleep(2);
+
+		// Agent broadcast ICMP message/advertisement
+		// If home network
+		if(homeOrForeign == 'H' || homeOrForeign == 'h')
+		{
+			// Initialize ICMP advertisement message
+			ICMP advertisement(ADVERTISEMENT, h.getHA(), true, false, true);
+			advertisement.insertCOA(h.getHA());
+
+			// Print advertisement
+			cout << "Home Agent broadcasting advertisement... " << endl;
+			advertisement.printICMP();
+		}
+		// Otherwise, foreign network
+		else
+		{
+			// Initialize ICMP advertisement message
+			ICMP advertisement(ADVERTISEMENT, f.getFA(), false, true, true);
+			advertisement.insertCOA(f.getFA());
+			
+			// Print advertisement
+			cout << "Foreign Agent broadcasting advertisement... " << endl;
+			advertisement.printICMP();
+		}
+		Sleep(2);	
+	
+
+	// Check if function is not at home network	
+	if( homeOrForeign == 'F' || homeOrForeign == 'f')
+    {    
+       // Confirm Mobile Node is in foreign network
+       cout << "Mobile Node is in foreign network!" << endl << endl;
+       Sleep(2);
+	}
+
+	// Otherwise, mobile IP is not needed
+    else cout << "Mobile Node is in home network, no need for Mobile IP!" << endl;
+
+	// Print divisor for next section
+	cout << "-------------------------------------------------------" << endl << endl;
+}
+
 /* steps on page 568 */
 void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 {
-   // Initialize variables
-   registrationMessage regData;
+// TODO: IMPLEMENT REGISTRATION FUNCTIONS
 
-//??
-   // Listen for broadcast???
-   cout << "Mobile Node listening for Home Agent or Foreign Agent advertisement..." << endl << endl;
+	// Initialize variables
+//   registrationMessage regData(;
+         
+   // MN: send request to foreign agent
+//   m.sendRequest( regData );
+   cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl << endl;
    Sleep(2);
-   
-   // Check if function is not at home network
-   if( h.isEmpty() )
-   {    
-      // Confirm Mobile Node is in foreign network
-      cout << "Mobile Node is in foreign network!" << endl << endl;
-      Sleep(2);
-      
-      // MN: send request to foreign agent
-      m.sendRequest( regData );
-      cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl << endl;
-      Sleep(2);
 
-      // FA: relay request to host agent
-      f.receiveRequest( regData );
-      cout << "Foreign Agent: Sending registration request to Host Agent..." << endl << endl;
-      Sleep(2);
+   // FA: relay request to host agent
+//   f.receiveRequest( regData );
+   cout << "Foreign Agent: Sending registration request to Host Agent..." << endl << endl;
+   Sleep(2);
       
-      // FA: update visitor list
-      f.sendRequest( regData );
-      cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
-      Sleep(2);
-      f.addEntry(m.getIP(), h.getHA(), m.getMAC(), 20);
-      f.printEntries();
-      cout << endl << "Visitor List is updated!" << endl << endl;
-      Sleep(3);
+   // FA: update visitor list
+//   f.sendRequest( regData );
+   cout << "Foreign Agent: Updating Visitor List..." << endl << endl;
+   Sleep(2);
+   f.addEntry(m.getIP(), h.getHA(), m.getMAC(), 20);
+   f.printEntries();
+   cout << endl << "Visitor List is updated!" << endl << endl;
+   Sleep(3);
       
-      // HA: send reply to foreign agent
-      cout << "Home Agent: Sending registration reply to Foreign Agent..." << endl << endl;
-      Sleep(2);
+   // HA: send reply to foreign agent
+   cout << "Home Agent: Sending registration reply to Foreign Agent..." << endl << endl;
+   Sleep(2);
       
-      // HA: update binding table
-      cout << "Home Agent: Updated Mobile Binding Table..." << endl << endl;
-      Sleep(2);
-      h.addEntry(m.getIP(), f.getFA(), 30);
-      h.printEntries();
-      cout << endl << "Mobile Binding Table is updated!" << endl << endl;
-      Sleep(3);
+   // HA: update binding table
+   cout << "Home Agent: Updated Mobile Binding Table..." << endl << endl;
+   Sleep(2);
+   h.addEntry(m.getIP(), f.getFA(), 30);
+   h.printEntries();
+   cout << endl << "Mobile Binding Table is updated!" << endl << endl;
+   Sleep(3);
       
-      // FA: relay reply to mobile node
-      cout << "Foreign Agent: Sending registration reply to Mobile Node..." << endl << endl;
-      Sleep(2);
-   }
-   
-   // Otherwise, mobile IP is not needed
-   else cout << "Mobile Node is in home network!" << endl;
-
+   // FA: relay reply to mobile node
+   cout << "Foreign Agent: Sending registration reply to Mobile Node..." << endl << endl;
+   Sleep(2);   
 }
 
 
