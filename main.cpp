@@ -1,3 +1,17 @@
+/*
+Authors: Truman Chan, Marco Rivas, David Mar
+CPE 400
+Project 2
+Topic: Mobile IP
+*/
+
+/*
+Abstract: Mobile IP allows mobile devices to keep their same IP address when they move between 
+		  networks. The main goal with IP mobility is to maintain a relatively unchanged TCP 
+		  connection between a moving mobile device and its corresponding host. 
+*/
+
+// Header Files
 #include <iostream>
 #include <string>
 #include <list>
@@ -8,6 +22,11 @@
 using namespace std;
 
 // Classes 
+/*
+The ICMP class is used during the agent discovery portion of mobile IP. Advertisements from
+home agents and foreign agents, along with the solicitation message from mobile nodes are
+ICMP messages
+*/
 enum ICMP_t { ADVERTISEMENT, SOLICITATION }; // advertisement is type 9, solicitation is type 10
 class ICMP
 {
@@ -47,6 +66,11 @@ class ICMP
 		list<string> COA;	// List of available Care-of-Addresses in foreign network
 };
 
+/*
+The registration message class is used during the registration portion of mobile IP. 
+Registration messages are sent inside UDP datagrams between the mobile node, foreign agent,
+and home agent.
+*/
 enum registration_t { REQUEST, REPLY };
 class registrationMessage
 {
@@ -84,6 +108,10 @@ class registrationMessage
 	   int id;						// 64-bit ID of message (Acts like sequence number to match REQUEST/REPLY)
 };
 
+/*
+Mobile node in this simulator is any device that is moving across networks. It is the 
+source and destination of datagrams sent between the correspondent node.
+*/
 class mobileNode
 {
    public:
@@ -103,6 +131,9 @@ class mobileNode
 	  string COA;  // Care-of-Address/current location of mobile node
 };
 
+/*
+Correspondent node in this simulator is the entity communicating with the mobile node.
+*/
 class correspondentNode
 {
 	public: 
@@ -117,6 +148,11 @@ class correspondentNode
 		string IP;  // IP for the web server, etc.
 };
 
+/*
+Home agent is the entity in a home network that performs the mobility management functions
+for the mobile node, such as forwarding packets to a foreign agent of a foreign network in
+which the mobile node is located.
+*/
 class homeAgent
 {
    public:
@@ -208,6 +244,11 @@ class homeAgent
       list<bindingEntry> bindingTable; // Mobility Binding Table     
 };
 
+/*
+Foreign agent is an entity inside a foreign network that helps the mobile node with mobility
+management functions, such as receiving datagrams addressed to a mobile node located in its
+network.
+*/
 class foreignAgent
 {
    public:
@@ -304,6 +345,15 @@ class foreignAgent
       list<visitorEntry> visitorList; // Visitor List           
 };
 
+/*
+The datagram class contains the data sent between mobile node and correspondent node. It
+contains the source and destination address, as well as a time-to-live. Datagrams are
+encapsulated to keep the correspondent's datagram intact when it needs to be sent to a home
+agent or foreign agent. The application receiving the datagram should be unwaware that the 
+datagram was forwarded via the home agent. Once an encapsulated datagram is received by the 
+foreign agent, it is decapsulated by removing the original correspondent datagram and 
+forwarded to the mobile node.
+*/
 class datagram
 {
    public:
@@ -330,36 +380,14 @@ class datagram
       int ID;        // Identification number of the datagram      
 };
 
-/*
-class applicationLayer
-{
-   public:
-      string message;
-
-};
-
-class transportLayer
-{
-   // public
-   class UDPsegment
-   {
-      
-   }
-};
-
-class networkLayer
-{
-   
-};
-*/
-
 // Function Prototype Declarations
 void Sleep(int);
 string generateIP();
 string generateMAC();
 void agentDiscovery(mobileNode&, homeAgent, foreignAgent, char);
 void registerMN(mobileNode, homeAgent, foreignAgent);
-void reverseTunnel(mobileNode, homeAgent, foreignAgent, correspondentNode);
+void indirectRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
+void directRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
 void routeOptimization(mobileNode, correspondentNode);
 
 // Main Simulation
@@ -417,7 +445,31 @@ int main()
 	    // Register Mobile Node to Home Agent
 	    registerMN( MN, HA, FA );   
 
-	    routeOptimization(MN, CN);
+		// Display Menu for routing
+		keepRunning = true;
+		do {
+			cout << "---------------------------------------------------------" << endl;
+			cout << "                    Datagram Routing                     " << endl;
+			cout << "---------------------------------------------------------" << endl;
+			cout << "1. Indirect routing" << endl;
+			cout << "2. Direct routing" << endl;
+			cout << "Enter a selection: ";
+			cin >> selection;
+			switch(selection)
+ 			{
+				case '1':
+					indirectRouting(MN, HA, FA, CN);
+					keepRunning = false;
+					break;
+				case '2':
+					directRouting(MN, HA, FA, CN);
+					keepRunning = false;
+					break;
+				default:
+					cout << endl << "Incorrect input, try again!";		
+			}
+			cout << endl;
+		} while(keepRunning);
     }
     return 0;
 }
@@ -425,6 +477,9 @@ int main()
 // Function Implementation
 void Sleep(int time) { this_thread::sleep_for(chrono::seconds(time)); }
 
+/*
+This function generates a random IP address
+*/
 string generateIP()
 {
    // Generate random IP address
@@ -439,6 +494,9 @@ string generateIP()
    return IP;
 }
 
+/*
+This function generates a random MAC address
+*/
 string generateMAC()
 {
    // Generate random MAC address
@@ -462,6 +520,20 @@ string generateMAC()
    return MAC;
 }
 
+/*
+This function simulates the agent discovery section of mobile IP. Its purpose is to 
+discover home or foreign agents via agent advertisement. 
+
+The first method is through advertisement, where an agent(home or foreign) periodically 
+broadcasts an ICMP message specified with a type field of 9 (router discovery). The ICMP
+message contains an IP address, home agent bit, foreign agent bit, registration required
+bit (mobile node cannot get COA, for example with DHCP, without first registering), and
+COA address fields.
+
+The second method is through solicitation, where the mobile node broadcasts an ICMP message
+specified with a type field of 10. When an agent receives the ICMP message, it unicasts an
+agent advertisement to that mobile node.
+*/
 void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForeign)
 {
 	// Select method (advertisement or solicitation)
@@ -535,9 +607,6 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 	// Check if function is not at home network	
 	if( homeOrForeign == 'F' || homeOrForeign == 'f')
     {    
-	   // Set COA for mobile node
-		m.setCOA(f.getFA());
-
        // Confirm Mobile Node is in foreign network
        cout << "Mobile Node is in foreign network!" << endl << endl;
        Sleep(2);
@@ -550,7 +619,32 @@ void agentDiscovery(mobileNode &m, homeAgent h, foreignAgent f, char homeOrForei
 	cout << "---------------------------------------------------------" << endl << endl;
 }
 
-/* steps on page 568 */
+/*
+This function registers a mobile node with its home agent when the mobile node is in a 
+foreign network. Registration can be done by the foreign agent or directly by the mobile node.
+The function below simulates registration by the foreign agent. There are four steps in
+registration with the home agent:
+
+	1. Mobile node sends registration message inside UDP datagram to port 434 to foreign 
+	   agent. Message contains Care-of-Address of foreign agent, the address of the home 
+	   agent, permanent IP address of the mobile node, the lifetime of the registration 
+	   entry, and a 64-bit identification of the registration 
+	   message (acts like sequence number to match received registration reply with request)
+	2. Foreign agent records mobile node's permanent IP and sends registration message 
+	   inside a UDP datagram to the home agent with encapsulation format
+	3. Home agent checks registration's authenticity and correctness, binds mobile node's 
+	   permanent IP with the care-of-address. Then sends a registration reply to 
+	   the foreign agent containing the address of the home agent, address of the mobile
+	   node, actual lifetime of the registration entry in the binding table, encapsulation
+	   format and registration message identification
+	4. Foreign agent receives the registration reply and forwards it to the 
+	   mobile node. The message contains the address of the home agent, address of the mobile
+	   node, lifetime of the registration entry, and registration message identification number
+
+NOTE: There is no need to deregister care-of-address when a mobile node leaves a foreign 
+network, because mobile node registering with a new foreign network takes care of this 
+automatically when the mobile node registers a new care-of-address.
+*/
 void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 {
 	// Display section title
@@ -564,6 +658,9 @@ void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 	int registrationId = rand() % 999;
 
     // MN: send request to foreign agent
+  	    // Set COA for mobile node
+		m.setCOA(f.getFA());
+
 		// Initialize registration REQUEST
 		registrationMessage request(REQUEST, m.getCOA(), h.getHA(), m.getIP(), lifetimeRequest, registrationId);
 	    cout << "Mobile Node: Sending registration request to Foreign Agent..." << endl;
@@ -610,11 +707,23 @@ void registerMN( mobileNode m, homeAgent h, foreignAgent f )
 	cout << "---------------------------------------------------------" << endl << endl;
 }
 
-
-void reverseTunnel(mobileNode MN,homeAgent HA, foreignAgent FA,correspondentNode CN){
-
-	// Send datagram from Mobile node to correspondent node
-	cout << "Sending packet from Mobile Node  to Foriegn Agent" << endl << endl;
+/*
+The correspondent node sends datagrams addressed to the mobile nodes permanent IP address.
+The datagrams are routed to the mobile node's home network, where the home agent will 
+intercept the datagrams. It forwards the encapsulated datagrams (tunneling) to the foreign 
+agent of the mobile node specified in its binding table. The foreign agent then forwards the 
+decapsulated datagrams to the mobile node. The correspondent node is unaware that the mobile 
+node is located in a foreign network.
+*/
+void indirectRouting(mobileNode MN,homeAgent HA, foreignAgent FA,correspondentNode CN)
+{
+	// Display section title
+	cout << "---------------------------------------------------------" << endl;
+	cout << "               Indirect Routing of Datagrams             " << endl;
+	cout << "---------------------------------------------------------" << endl;
+  
+	// Send datagram from correspondent node to home agent
+	cout << "Sending packet from Mobile Node to Foreign Agent" << endl << endl;
 
 	datagram originalDatagram(MN.getIP(), FA.getFA(), 15, rand() % 65536);
 
@@ -639,12 +748,31 @@ void reverseTunnel(mobileNode MN,homeAgent HA, foreignAgent FA,correspondentNode
 	// packet arrived
 	cout << "Correspondent Node recieved packet" << endl << endl;
 
+	// Print divisor for next section
+	cout << "---------------------------------------------------------" << endl << endl;
 }
 
-
-void routeOptimization(mobileNode MN, correspondentNode CN)
+/*
+Direct routing solves the triangle routing problem, which is the inefficiency of sending
+datagrams to the home agent if the mobile node and correspondent node are in close proximity.
+With direct routing, the correspondent node must first learn the care-of-address of the
+mobile node at the beginning of a session. This is done with a query by the correspondent 
+agent to the home agent. After this initial query, the correspondent node can directly
+tunnel datagrams to the mobile node's care-of-address. With this method, a foreign anchor
+agent is needed, since the mobile node's care-of-address is only queried once. The first
+foreign agent serves as the foreign anchor agent. This anchor is needed if the mobile node 
+moves to a different foreign network. Once the mobile node moves to a new foreign network,
+the foreign agent of that network sends the foreign anchor agent the mobile node's new 
+care-of-address. The correspondent node tunnels datagrams addressed to the foreign anchor 
+agent, who then forwards those datagrams to the mobile node's new foreign agent.
+*/
+void directRouting(mobileNode MN,homeAgent HA, foreignAgent FA,correspondentNode CN)
 {
-
+	// Display section title
+	cout << "---------------------------------------------------------" << endl;
+	cout << "                Direct Routing of Datagrams              " << endl;
+	cout << "---------------------------------------------------------" << endl;
+  
 	// send Datagram directly to Correspondent Node using permanent home address
 
 	cout << "Mobile Node sending datagram to Correspondent Node using permanent home address" << endl << endl;
@@ -652,4 +780,7 @@ void routeOptimization(mobileNode MN, correspondentNode CN)
 	datagram newDatagram(MN.getIP(), CN.getIP(), 15, rand() % 65536);
 
 	newDatagram.print();
+
+	// Print divisor for next section
+	cout << "---------------------------------------------------------" << endl << endl;
 }
