@@ -19,6 +19,7 @@ Abstract: Mobile IP allows mobile devices to keep their same IP address when the
 #include <thread>
 #include <chrono>
 #include <fstream>
+#include <vector>
 
 using namespace std;
 
@@ -31,7 +32,28 @@ enum registration_t { REQUEST, REPLY };		 // registration message type
 enum routing_t { INDIRECT, DIRECT };     	 // datagram routing methods
 enum network { HOME, FOREIGN };			     // home network or foreign network
 
-// Classes 
+// Class declarations
+class ICMP;
+class registrationMessage;
+class mobileNode;
+class correspondentNode;
+class homeAgent;
+class foreignAgent;
+class datagram;
+
+// Function Prototype Declarations
+void Sleep(int);
+string generateIP();
+string generateMAC();
+void configuration(ICMP_t&, routing_t&, network&);
+void displayInformation(mobileNode, homeAgent, foreignAgent, int);
+void agentDiscovery(mobileNode, homeAgent, foreignAgent, network, ICMP_t);
+void registerMN(mobileNode&, homeAgent&, foreignAgent&);
+void indirectRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
+void directRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
+void outputDatabase(mobileNode, homeAgent, foreignAgent, correspondentNode);
+
+// Class Implementations
 /*
 The ICMP class is used during the agent discovery portion of mobile IP. Advertisements from
 home agents and foreign agents, along with the solicitation message from mobile nodes are
@@ -124,10 +146,25 @@ class mobileNode
 {
    public:
       // Constructor
+	  mobileNode() { IP = ""; MAC = generateMAC(); COA = ""; }
       mobileNode(string internetProtocol, string MACAddress) : IP (internetProtocol), MAC(MACAddress), COA("N/A") {}
       
       // Member Functions
       string getIP() { return IP; }
+	  void setIP(string address, mobileNode a[], int size) 
+	  { 
+		bool flag;
+		do
+		{
+		  flag = false;
+		  IP = address.replace(address.find_last_of("."), 4, "." + to_string(rand() % 254 + 1)); 
+		  for(int i=0;i<size;i++)
+		  {
+			  if(IP == a[i].getIP()) flag = true;
+		  }
+		} while(flag);
+	  
+	  }
       string getMAC() { return MAC; }
 	  void setCOA(string careOfAddress) { COA = careOfAddress; }
 	  string getCOA() { return COA; }
@@ -280,6 +317,7 @@ class foreignAgent
 {
    public:
       // Constructor
+	  foreignAgent() { FAAddress = generateIP(); }
       foreignAgent(string FA) { FAAddress = FA; }
          
       // Member Functions
@@ -426,18 +464,6 @@ class datagram
       int sequenceNumber;	   // Identification number of the datagram      
 };
 
-// Function Prototype Declarations
-void Sleep(int);
-string generateIP();
-string generateMAC();
-void configuration(ICMP_t&, routing_t&, network&);
-void displayInformation(mobileNode, homeAgent, foreignAgent);
-void agentDiscovery(mobileNode, homeAgent, foreignAgent, network, ICMP_t);
-void registerMN(mobileNode&, homeAgent&, foreignAgent&);
-void indirectRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
-void directRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
-void outputDatabase(mobileNode, homeAgent, foreignAgent, correspondentNode);
-
 // Main Simulation
 int main()
 {
@@ -445,6 +471,9 @@ int main()
 	srand((unsigned int) time(NULL));
 
     // Initialize objects
+//	vector<mobileNode> mobileNodes;
+//	vector<foreignAgent> foreignAgents;
+
     mobileNode MN(generateIP(), generateMAC());
 	homeAgent HA(MN.getIP());
     foreignAgent FA(generateIP());
@@ -455,16 +484,8 @@ int main()
 	routing_t routingMethod;
 	network networkSelection;
 
-	// Display information
-	cout << endl << "----------------------INITIAL INFORMATION------------------------" << endl << endl;
-	cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
-	cout << "Home Agent address: " << HA.getHA() << endl;
-	HA.printEntries();
-	cout << endl;
-	cout << "Foreign Agent address: " << FA.getFA() << endl;
-	FA.printEntries();
-	cout << endl;
-	cout << "----------------------INITIAL INFORMATION------------------------" << endl << endl << endl;
+	// Display Initial Information
+	displayInformation(MN, HA, FA, 1);
 
 	// Display configuration prompt
 	configuration(agentMethod, routingMethod, networkSelection);
@@ -556,13 +577,32 @@ string generateMAC()
 /*
 Prints information of mobile node, home agent, foreign agent
 */
-void displayInformation(mobileNode MN, homeAgent HA, foreignAgent FA)
+void displayInformation(mobileNode MN, homeAgent HA, foreignAgent FA, int selection)
 {
-	// Display information
-	cout << "Mobile Node IP: " << MN.getIP() << endl;
-	cout << "Home Agent address: " << HA.getHA() << endl;
-	cout << "Foreign Agent address: " << FA.getFA() << endl;
-	cout << "--------------------------------------" << endl << endl;
+	// Print option 1
+	if(selection == 1)
+	{
+		// Display information
+		cout << endl << "----------------------INITIAL INFORMATION------------------------" << endl << endl;
+		cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
+		cout << "Home Agent address: " << HA.getHA() << endl;
+		HA.printEntries();
+		cout << endl;
+		cout << "Foreign Agent address: " << FA.getFA() << endl;
+		FA.printEntries();
+		cout << endl;
+		cout << "----------------------INITIAL INFORMATION------------------------" << endl << endl << endl;
+	}
+
+	// Print option 2
+	else
+	{
+		// Display information
+		cout << "Mobile Node IP: " << MN.getIP() << endl;
+		cout << "Home Agent address: " << HA.getHA() << endl;
+		cout << "Foreign Agent address: " << FA.getFA() << endl;
+		cout << "--------------------------------------" << endl << endl;
+	}
 }
 
 /*
@@ -681,7 +721,7 @@ void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, network networkSe
 	cout << "---------------------------------------------------------" << endl;
 
 	// Display information
-	displayInformation(m, h, f);
+	displayInformation(m, h, f, 2);
 
 	// Solicitation
 	if(agentMethod == SOLICITATION)
@@ -780,7 +820,7 @@ void registerMN( mobileNode &m, homeAgent &h, foreignAgent &f )
 	cout << "---------------------------------------------------------" << endl;
 
 	// Display information
-	displayInformation(m, h, f);
+	displayInformation(m, h, f, 2);
 
 	// Create registration lifetime and ID
 	int lifetimeRequest = rand() % 8000 + 1999;
@@ -856,7 +896,7 @@ void indirectRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondent
 	cout << "---------------------------------------------------------" << endl;
   
 	// Display information
-	displayInformation(MN, HA, FA);
+	displayInformation(MN, HA, FA, 2);
 
 	// Initialize datagram
 	int sequenceNumber = rand() % 65536;
@@ -913,7 +953,7 @@ void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNo
 	cout << "---------------------------------------------------------" << endl;
   
 	// Display information
-	displayInformation(MN, HA, FA);
+	displayInformation(MN, HA, FA, 2);
 
 	// Initialize datagram
 	int sequenceNumber = rand() % 65535;
