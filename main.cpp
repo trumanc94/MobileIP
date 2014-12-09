@@ -18,11 +18,18 @@ Abstract: Mobile IP allows mobile devices to keep their same IP address when the
 #include <stdlib.h>
 #include <thread>
 #include <chrono>
+#include <fstream>
 
 using namespace std;
 
 // Global Variables
 const int sleepTime = 0;	// Sets amount of time between each simulator display message
+
+// Enumerations
+enum ICMP_t { ADVERTISEMENT, SOLICITATION }; // advertisement is type 9, solicitation is type 10
+enum registration_t { REQUEST, REPLY };		 // registration message type
+enum routing_t { INDIRECT, DIRECT };     	 // datagram routing methods
+enum network { HOME, FOREIGN };			     // home network or foreign network
 
 // Classes 
 /*
@@ -30,7 +37,6 @@ The ICMP class is used during the agent discovery portion of mobile IP. Advertis
 home agents and foreign agents, along with the solicitation message from mobile nodes are
 ICMP messages
 */
-enum ICMP_t { ADVERTISEMENT, SOLICITATION }; // advertisement is type 9, solicitation is type 10
 class ICMP
 {
 	public:
@@ -74,7 +80,6 @@ The registration message class is used during the registration portion of mobile
 Registration messages are sent inside UDP datagrams between the mobile node, foreign agent,
 and home agent.
 */
-enum registration_t { REQUEST, REPLY };
 class registrationMessage
 {
    public:
@@ -119,7 +124,7 @@ class mobileNode
 {
    public:
       // Constructor
-      mobileNode(string internetProtocol, string MACAddress) : IP (internetProtocol), MAC(MACAddress) {}
+      mobileNode(string internetProtocol, string MACAddress) : IP (internetProtocol), MAC(MACAddress), COA("N/A") {}
       
       // Member Functions
       string getIP() { return IP; }
@@ -141,7 +146,7 @@ class correspondentNode
 {
 	public: 
 		// Constructor
-		correspondentNode(string internetProtocol) {IP = internetProtocol; }
+		correspondentNode(string internetProtocol) { IP = internetProtocol; }
 
 		// Member Functions
 		string getIP()  { return IP; }
@@ -160,7 +165,7 @@ class homeAgent
 {
    public:
       // Constructor
-      homeAgent(string HA) { HAAddress = HA; }
+      homeAgent(string MN) { HAAddress = MN.replace(MN.find_last_of("."), 4, "." + to_string(rand() % 254 + 1)); }
       
       // Member Functions
       string getHA() { return HAAddress; }
@@ -199,7 +204,26 @@ class homeAgent
              cout << " |" << endl;             
          }
       }
-      
+
+      void outputEntries(ofstream &fout)
+      {
+         // Print Binding Table title
+         fout << "\t Mobility Binding Table:" << endl;
+                  
+		 // If binding table empty, display message
+		 if(bindingTable.empty()) fout << "\t <NO ENTRIES>" << endl;
+
+         // Iterate through Mobility Binding Table and print each entry
+         std::list<bindingEntry>::const_iterator iterator;
+         for(iterator = bindingTable.begin(); 
+                              iterator != bindingTable.end(); ++iterator)
+         {
+             fout << "\t <MN: " << (*iterator).homeAddress;
+             fout << ", COA: " << (*iterator).COA;
+             fout << ", Lifetime: " << (*iterator).lifetime << ">" << endl;
+         }
+      }
+
    private:
       // Mobility Binding Table entries
       class bindingEntry
@@ -298,7 +322,27 @@ class foreignAgent
              cout << " |" << endl;
          }
       }
-               
+
+      void outputEntries(ofstream &fout)
+      {
+         // Print Binding Table title
+         fout << "\t Visitor List:" << endl;
+                  
+		 // If binding table empty, display message
+		 if(visitorList.empty()) fout << "\t <NO ENTRIES>" << endl;
+
+         // Iterate through Mobility Binding Table and print each entry
+         std::list<visitorEntry>::const_iterator iterator;
+         for(iterator = visitorList.begin(); 
+                              iterator != visitorList.end(); ++iterator)
+         {
+             fout << "\t <MN: " << (*iterator).homeAddress;
+             fout << ", HA: " << (*iterator).HAAddress;
+			 fout << ", MAC: " << (*iterator).mediaAddress;
+             fout << ", Lifetime: " << (*iterator).lifetime << ">" << endl;
+         }
+      }
+
    private:
       // Visitor List entries
       class visitorEntry
@@ -386,11 +430,13 @@ class datagram
 void Sleep(int);
 string generateIP();
 string generateMAC();
+void configuration(ICMP_t&, routing_t&, network&);
 void displayInformation(mobileNode, homeAgent, foreignAgent);
-void agentDiscovery(mobileNode, homeAgent, foreignAgent, char);
+void agentDiscovery(mobileNode, homeAgent, foreignAgent, network, ICMP_t);
 void registerMN(mobileNode&, homeAgent&, foreignAgent&);
 void indirectRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
 void directRouting(mobileNode, homeAgent, foreignAgent, correspondentNode);
+void outputDatabase(mobileNode, homeAgent, foreignAgent, correspondentNode);
 
 // Main Simulation
 int main()
@@ -400,14 +446,17 @@ int main()
 
     // Initialize objects
     mobileNode MN(generateIP(), generateMAC());
-	homeAgent HA(MN.getIP().replace(MN.getIP().find_last_of("."), 4, "." + to_string(rand() % 254 + 1)));
+	homeAgent HA(MN.getIP());
     foreignAgent FA(generateIP());
     correspondentNode CN(generateIP());
 	char selection;
 	bool keepRunning = true;
+	ICMP_t agentMethod;
+	routing_t routingMethod;
+	network networkSelection;
 
 	// Display information
-	cout << endl << "----------------------INFORMATION------------------------" << endl << endl;
+	cout << endl << "----------------------INITIAL INFORMATION------------------------" << endl << endl;
 	cout << "Mobile Node IP: " << MN.getIP() << endl << endl;
 	cout << "Home Agent address: " << HA.getHA() << endl;
 	HA.printEntries();
@@ -415,66 +464,47 @@ int main()
 	cout << "Foreign Agent address: " << FA.getFA() << endl;
 	FA.printEntries();
 	cout << endl;
-	cout << "----------------------INFORMATION------------------------" << endl << endl << endl;
+	cout << "----------------------INITIAL INFORMATION------------------------" << endl << endl << endl;
+
+	// Display configuration prompt
+	configuration(agentMethod, routingMethod, networkSelection);
 
     // Display Main Menu
 	do {
-		cout << "---------------------------------------------------------" << endl;
-		cout << "                        Mobile IP                        " << endl;
-	    cout << "---------------------------------------------------------" << endl;
-	    cout << "Select if mobile node is in (H)ome or (F)oreign network: ";
-	    cin >> selection;
-	    switch(selection)
- 		{
-			case 'H':
-			case 'h':
-			case 'F':
-			case 'f':
-				keepRunning = false;
+
+		// Agent Discovery
+		agentDiscovery(MN, HA, FA, networkSelection, agentMethod);
+
+		// If mobile node is in foreign network
+		if(networkSelection == FOREIGN)
+		{
+			// Register Mobile Node to Home Agent
+			registerMN( MN, HA, FA );   
+
+			// Datagram routing
+			if(routingMethod == INDIRECT) indirectRouting(MN, HA, FA, CN);
+			else if(routingMethod == DIRECT) directRouting(MN, HA, FA, CN);
+		}
+
+		// Prompt user for next action
+		cout << "1. Reconfigure simulator" << endl;
+		cout << "2. Quit simulator" << endl;
+		cout << "Enter your selection: ";
+		cin >> selection;
+		switch(selection)
+		{
+			case '1':
+				configuration(agentMethod, routingMethod, networkSelection);
 				break;
 			default:
-				cout << endl << "Incorrect input, try again!";		
+				keepRunning = false;
 		}
-		cout << endl;
-	} while(keepRunning);
+    } while(keepRunning);
 
-    // Agent Discovery
-    agentDiscovery(MN, HA, FA, selection);
-   
-	// If mobile node is in foreign network
-    if(selection == 'F' || selection == 'f')
-    {
-	    // Register Mobile Node to Home Agent
-	    registerMN( MN, HA, FA );   
+	// Output results to database
+	outputDatabase(MN, HA, FA, CN);
 
-		// Display Menu for routing
-		keepRunning = true;
-		do {
-			cout << "---------------------------------------------------------" << endl;
-			cout << "                    Datagram Routing                     " << endl;
-			cout << "---------------------------------------------------------" << endl;
-			cout << "1. Indirect routing" << endl;
-			cout << "2. Direct routing" << endl;
-			cout << "Enter a selection: ";
-			cin >> selection;
-			cout << endl;
-			switch(selection)
- 			{
-				case '1':
-					indirectRouting(MN, HA, FA, CN);
-					keepRunning = false;
-					break;
-				case '2':
-					directRouting(MN, HA, FA, CN);
-					keepRunning = false;
-					break;
-				default:
-					cout << endl << "Incorrect input, try again!";		
-			}
-			cout << endl;
-		} while(keepRunning);
-    }
-    return 0;
+	return 0;
 }
 
 // Function Implementation
@@ -536,6 +566,98 @@ void displayInformation(mobileNode MN, homeAgent HA, foreignAgent FA)
 }
 
 /*
+This function is the user prompt that initializes the simulation environment for Mobile IP. The user will
+be prompted to select the agent discovery method(Advertisement or Solicitation), and routing method(indirect
+or direct).
+*/
+void configuration(ICMP_t& agentDiscovery, routing_t& r, network& n)
+{
+	// Initialize variables
+	char selection;
+	bool continueRunning = true, flag1 = false, flag2 = false, flag3 = false;
+	
+	// Display title
+	cout << "---------------------------------------------------------" << endl;
+	cout << "                        Mobile IP                        " << endl;
+    cout << "---------------------------------------------------------" << endl;
+
+	// Prompt for configuration
+	do {
+		// Network
+		if(!flag1)
+		{
+			cout << "Select if mobile node is in (H)ome or (F)oreign network: ";
+			cin >> selection;
+			switch(selection)
+ 			{
+				case 'H':
+				case 'h':
+					n = HOME;
+					flag1 = true;
+					break;
+				case 'F':
+				case 'f':
+					n = FOREIGN;
+					flag1 = true;
+					break;
+				default:
+					cout << endl << "Incorrect input, try again!";		
+			}
+			cout << endl;
+		}
+		// Agent Discovery prompt
+		else if(!flag2)
+		{
+			cout << "Select Agent Discovery method as (A)dvertisement or (S)olicitation: ";
+			cin >> selection;
+			switch(selection)
+ 			{
+				case 'A':
+				case 'a':
+					agentDiscovery = ADVERTISEMENT;
+					flag2 = true;
+					break;
+				case 'S':
+				case 's':
+					agentDiscovery = SOLICITATION;
+					flag2 = true;
+					break;
+				default:
+					cout << endl << "Incorrect input, try again!";		
+			}
+			cout << endl;
+		}
+		// Routing of datagrams prompt
+		else if(!flag3)
+		{
+			cout << "Select Routing method of datagrams as (I)ndirect or (D)irect: ";
+			cin >> selection;
+			switch(selection)
+ 			{
+				case 'I':
+				case 'i':
+					r = INDIRECT;
+					flag3 = true;
+					break;
+				case 'D':
+				case 'd':
+					r = DIRECT;
+					flag3 = true;
+					break;
+				default:
+					cout << endl << "Incorrect input, try again!";		
+			}
+			cout << endl;
+		}
+		// End prompt when user enters correct options
+		else
+		{
+			continueRunning = false;
+		}
+	} while(continueRunning);		
+}
+
+/*
 This function simulates the agent discovery section of mobile IP. Its purpose is to 
 discover home or foreign agents via agent advertisement. 
 
@@ -549,36 +671,20 @@ The second method is through solicitation, where the mobile node broadcasts an I
 specified with a type field of 10. When an agent receives the ICMP message, it unicasts an
 agent advertisement to that mobile node.
 */
-void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeign)
+void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, network networkSelection, ICMP_t agentMethod)
 {
 	// Select method (advertisement or solicitation)
-	char selection;
-	bool keepRunning = true;
-	do {
-		cout << "---------------------------------------------------------" << endl;
-		cout << "                     Agent Discovery                     " << endl;
-		cout << "---------------------------------------------------------" << endl;
-		cout << "1. Advertisement" << endl;
-		cout << "2. Solicitation" << endl;
-		cout << "Enter agent discovery method: ";
-		cin >> selection;
-		switch(selection)
-		{
-			case '1':
-			case '2':
-				keepRunning = false;
-				break;
-			default:
-				cout << endl << "Incorrect input, try again!";		
-		}
-		cout << endl;
-	} while(keepRunning);
+	cout << "---------------------------------------------------------" << endl;
+	cout << "            Agent Discovery (";
+	if(agentMethod == ADVERTISEMENT) cout << "ADVERTISEMENT)" << endl;
+	else if(agentMethod == SOLICITATION) cout << "SOLICITATION)" << endl;
+	cout << "---------------------------------------------------------" << endl;
 
 	// Display information
 	displayInformation(m, h, f);
 
 	// Solicitation
-	if(selection == '2')
+	if(agentMethod == SOLICITATION)
 	{
 		// Initialize ICMP solicitation message
 		ICMP solicitation(SOLICITATION, m.getIP(), false, false, false);
@@ -596,14 +702,14 @@ void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeig
 
 		// Agent broadcast ICMP message/advertisement
 		// If home network
-		if(homeOrForeign == 'H' || homeOrForeign == 'h')
+		if(networkSelection == HOME)
 		{
 			// Initialize ICMP advertisement message
 			ICMP advertisement(ADVERTISEMENT, h.getHA(), true, false, false);
 			advertisement.insertCOA(h.getHA());
 
 			// Print advertisement
-			if( selection == '2') cout << "Home Agent UNICASTING advertisement... " << endl;
+			if( agentMethod == SOLICITATION ) cout << "Home Agent UNICASTING advertisement... " << endl;
 			else cout << "Home Agent BROADCASTING advertisement... " << endl;
 			advertisement.printICMP();
 		}
@@ -615,7 +721,7 @@ void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeig
 			advertisement.insertCOA(f.getFA());
 			
 			// Print advertisement
-			if( selection == '2') cout << "Foreign Agent UNICASTING advertisement... " << endl;
+			if( agentMethod == SOLICITATION ) cout << "Foreign Agent UNICASTING advertisement... " << endl;
 			else cout << "Foreign Agent BROADCASTING advertisement... " << endl;
 			advertisement.printICMP();
 		}
@@ -625,7 +731,7 @@ void agentDiscovery(mobileNode m, homeAgent h, foreignAgent f, char homeOrForeig
 	cout << "Mobile Node received advertisement!" << endl;
 
 	// Check if function is not at home network	
-	if( homeOrForeign == 'F' || homeOrForeign == 'f')
+	if( networkSelection == FOREIGN )
     {    
        // Confirm Mobile Node is in foreign network
        cout << "Mobile Node is in foreign network!" << endl << endl;
@@ -921,4 +1027,47 @@ void directRouting(mobileNode MN, homeAgent HA, foreignAgent FA, correspondentNo
 
 	// Print divisor for next section
 	cout << "---------------------------------------------------------" << endl << endl;
+}
+
+/*
+Once the simulation reaches its end, this function outputs all data; mobile nodes, home agents, foreign 
+agents, and correspondent nodes into a text file database called "output.txt". 
+*/
+void outputDatabase(mobileNode m, homeAgent h, foreignAgent f, correspondentNode c)
+{
+	// Initialize variables
+	ofstream fout;
+
+	// clear
+	fout.clear();
+
+	// Open file
+	fout.open("output.txt");
+
+	// Output data to database
+	fout << "DATABASE" << endl << "--------" << endl << endl;
+
+		// Mobile Nodes
+		fout << "Mobile Nodes" << endl << "------------" << endl;		
+		fout << "IP: " << m.getIP() << ", MAC: " << m.getMAC() << ", COA: " << m.getCOA() << endl << endl;
+
+		// Home Agents
+		fout << "Home Agents" << endl << "-----------" << endl;
+		fout << "Address: " << h.getHA() << endl;
+		h.outputEntries(fout);
+		fout << endl;
+
+		// Foreign Agents
+		fout << "Foreign Agents" << endl << "-----------" << endl;
+		fout << "Address: " << f.getFA() << endl;
+		f.outputEntries(fout);
+		fout << endl;
+
+		// Correspondent Nodes
+		fout << "Correspondent Nodes" << endl << "-------------------" << endl;
+		fout << "IP: " << c.getIP() << endl;
+
+	// Close file
+	fout.close();
+
 }
