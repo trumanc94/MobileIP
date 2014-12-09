@@ -202,11 +202,25 @@ class homeAgent
 {
    public:
       // Constructor
+	  homeAgent() { HAAddress = ""; }
       homeAgent(string MN) { HAAddress = MN.replace(MN.find_last_of("."), 4, "." + to_string(rand() % 254 + 1)); }
       
       // Member Functions
       string getHA() { return HAAddress; }
-
+	  void setHA(string address, homeAgent a[], int size) 
+	  { 
+		bool flag;
+		do
+		{
+		  flag = false;
+		  HAAddress = address.replace(address.find_last_of("."), 4, "." + to_string(rand() % 254 + 1)); 
+		  for(int i=0;i<size;i++)
+		  {
+			  if(HAAddress == a[i].getHA()) flag = true;
+		  }
+		} while(flag);
+	  
+	  }
       void addEntry(string home, string coa, int time)
       {
          // Add new binding entry to Mobility Binding Table
@@ -471,18 +485,24 @@ int main()
 	srand((unsigned int) time(NULL));
 
     // Initialize objects
-//	vector<mobileNode> mobileNodes;
-//	vector<foreignAgent> foreignAgents;
-
-    mobileNode MN(generateIP(), generateMAC());
-	homeAgent HA(MN.getIP());
-    foreignAgent FA(generateIP());
+	vector<mobileNode> mobileNodes;
+	vector<foreignAgent> foreignAgents;
+	vector<homeAgent> homeAgents;	
     correspondentNode CN(generateIP());
 	char selection;
 	bool keepRunning = true;
 	ICMP_t agentMethod;
 	routing_t routingMethod;
 	network networkSelection;
+
+    // Initialize simulator with first mobile node, home agent, foreign agent	
+	mobileNode MN(generateIP(), generateMAC());
+	homeAgent HA(MN.getIP());
+    foreignAgent FA(generateIP());
+
+	mobileNodes.insert(MN);
+	homeAgents.insert(HA);
+	foreignAgents.insert(FA);
 
 	// Display Initial Information
 	displayInformation(MN, HA, FA, 1);
@@ -509,7 +529,8 @@ int main()
 
 		// Prompt user for next action
 		cout << "1. Reconfigure simulator" << endl;
-		cout << "2. Quit simulator" << endl;
+		cout << "2. Add new mobile node" << endl;
+		cout << "3. Quit simulator" << endl;
 		cout << "Enter your selection: ";
 		cin >> selection;
 		switch(selection)
@@ -517,6 +538,8 @@ int main()
 			case '1':
 				configuration(agentMethod, routingMethod, networkSelection);
 				break;
+			case '2':
+
 			default:
 				keepRunning = false;
 		}
